@@ -1,8 +1,11 @@
+// Tệp: frontend/src/App.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 
-const API_URL = 'http://localhost:5000/api';
+// Đã gắn sẵn đường dẫn Render của bạn
+const API_URL = 'https://ln-training-backend.onrender.com/api';
+
 const DAYS = [
   { num: 2, label: 'Thứ 2' },
   { num: 3, label: 'Thứ 3' },
@@ -12,6 +15,33 @@ const DAYS = [
   { num: 7, label: 'Thứ 7' },
   { num: 8, label: 'Chủ Nhật' }
 ];
+
+// Lấy đúng ngày hiện tại theo giờ địa phương (YYYY-MM-DD)
+function getTodayStr() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Tự động tính Thứ 2 đầu tuần và Chủ Nhật cuối tuần của tuần hiện tại
+function getCurrentWeekRange() {
+  const now = new Date();
+  const day = now.getDay(); // 0 (CN) -> 6 (T7)
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const fmt = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  return { start: fmt(monday), end: fmt(sunday) };
+}
 
 function parseTimeToMinutes(timeStr) {
   if (!timeStr) return 9999;
@@ -23,12 +53,19 @@ function parseTimeToMinutes(timeStr) {
 }
 
 export default function App() {
+  const weekRange = getCurrentWeekRange();
+
   const [activeTab, setActiveTab] = useState('DAILY');
   const [trainers, setTrainers] = useState([]);
   const [clients, setClients] = useState([]);
-  const [selectedDate, setSelectedDate] = useState('2026-11-09');
+  // Tự động lấy ngày hôm nay ngay khi vào web
+  const [selectedDate, setSelectedDate] = useState(getTodayStr);
   const [sessions, setSessions] = useState([]);
   const [autoSortTime, setAutoSortTime] = useState(true);
+
+  // Chế độ hiển thị Full khung (fitScreen = true giúp gom tất cả cột vừa khít màn hình)
+  const [fitScreen, setFitScreen] = useState(true);
+  const [isFullscreenBoard, setIsFullscreenBoard] = useState(false);
 
   const [editingSession, setEditingSession] = useState(null);
   const [editForm, setEditForm] = useState({
@@ -52,8 +89,8 @@ export default function App() {
   const [searchClient, setSearchClient] = useState('');
   const [editingClient, setEditingClient] = useState(null);
 
-  const [startDate, setStartDate] = useState('2026-11-09');
-  const [endDate, setEndDate] = useState('2026-11-15');
+  const [startDate, setStartDate] = useState(weekRange.start);
+  const [endDate, setEndDate] = useState(weekRange.end);
   const [weeklySummary, setWeeklySummary] = useState([]);
 
   useEffect(() => {
@@ -75,13 +112,20 @@ export default function App() {
     setSessions(res.data);
   };
 
+  // Chuyển nhanh ngày hôm trước / hôm sau
+  const changeDayBy = (delta) => {
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + delta);
+    const nextStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    setSelectedDate(nextStr);
+  };
+
   const getSortedTrainerSessions = (trainerId) => {
     const list = sessions.filter(s => s.trainerId === trainerId);
     if (!autoSortTime) return list;
     return [...list].sort((a, b) => parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time));
   };
 
-  // Tự động tính số dòng: tối thiểu 10 dòng, nếu PT có trên 10 khách sẽ tự động cộng thêm dòng
   const maxSessionsInColumn = trainers.reduce((max, trainer) => {
     const count = sessions.filter(s => s.trainerId === trainer._id).length;
     return Math.max(max, count);
@@ -92,14 +136,13 @@ export default function App() {
     const [y, m, d] = dateStr.split('-').map(Number);
     const jsDay = new Date(y, m - 1, d).getDay();
     const dayLabel = jsDay === 0 ? 'Chủ Nhật' : `Thứ ${jsDay + 1}`;
-    return `Lịch PT (${dayLabel} ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')})`;
+    return `Lịch PT (${dayLabel} - ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y})`;
   };
 
-  // Xuất Bảng Lịch Ngày ra tệp Excel (.xlsx)
   const exportDailyToExcel = () => {
     const aoa = [];
     aoa.push([formatHeaderDate(selectedDate)]);
-    aoa.push(['Ca / PT', ...trainers.map(t => t.name)]);
+    aoa.push(['Ca', ...trainers.map(t => t.name)]);
 
     for (let r = 0; r < dynamicRowCount; r++) {
       const rowData = [r + 1];
@@ -129,7 +172,7 @@ export default function App() {
     aoa.push(footerRow);
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 10 }, ...trainers.map(() => ({ wch: 24 }))];
+    ws['!cols'] = [{ wch: 8 }, ...trainers.map(() => ({ wch: 22 }))];
     ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: trainers.length } }];
 
     const wb = XLSX.utils.book_new();
@@ -137,7 +180,6 @@ export default function App() {
     XLSX.writeFile(wb, `Lich_PT_${selectedDate}.xlsx`);
   };
 
-  // Xuất Bảng Tổng Hợp Tuần ra tệp Excel (.xlsx)
   const exportWeeklyToExcel = () => {
     const aoa = [
       [`BÁO CÁO TỔNG HỢP CA PT (${startDate} đến ${endDate})`],
@@ -146,14 +188,14 @@ export default function App() {
 
     trainers.forEach(trainer => {
       const item = weeklySummary.find(w => w._id === trainer._id);
-      const detailStr = item?.dailyBreakdown
-        ?.map(d => `${d.date.slice(5)}: ${d.count} ca`)
-        .join(', ') || 'Chưa có ca chốt';
+      const detailStr =
+        item?.dailyBreakdown?.map(d => `${d.date.slice(5)}: ${d.count} ca`).join(', ') ||
+        'Chưa có ca chốt';
       aoa.push([trainer.name, detailStr, item ? item.totalShifts : 0]);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 24 }, { wch: 48 }, { wch: 18 }];
+    ws['!cols'] = [{ wch: 22 }, { wch: 45 }, { wch: 16 }];
     ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
 
     const wb = XLSX.utils.book_new();
@@ -274,265 +316,402 @@ export default function App() {
 
   const isDayLocked = sessions.some(s => s.isLocked);
   const totalValidShifts = sessions.filter(s => s.status !== 'CANCELLED').length;
-  const totalCancelledShifts = sessions.filter(s => s.status === 'CANCELLED' && s.clientName !== 'OFF').length;
-  const totalOffTrainers = sessions.filter(s => s.clientName === 'OFF').length;
+  const totalCancelledShifts = sessions.filter(
+    s => s.status === 'CANCELLED' && s.clientName !== 'OFF'
+  ).length;
 
   return (
-    <div style={styles.page}>
-      {/* Header hiện đại */}
-      <header style={styles.header}>
-        <div style={styles.brandGroup}>
-          <div style={styles.logoBadge}>LN</div>
-          <div>
-            <h1 style={styles.title}>LN TRAINING — QUẢN LÝ LỊCH & CHỐT CA PT</h1>
-            <p style={styles.subtitle}>
-              Tự động co giãn số dòng khi vượt 10 ca/ngày • Kéo thả đổi PT • Xuất báo cáo Excel
-            </p>
+    <div className="app-wrapper">
+      {/* CSS Responsive tối ưu hiển thị Full Bảng trên cả Điện Thoại và Máy Tính */}
+      <style>{`
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; background: #f1f5f9; font-family: 'Inter', 'Segoe UI', sans-serif; color: #0f172a; }
+        .app-wrapper { min-height: 100vh; display: flex; flex-direction: column; }
+
+        /* Thanh Header gọn gàng */
+        .top-header {
+          background: #0f172a; color: #fff; padding: 8px 14px;
+          display: flex; justify-content: space-between; align-items: center;
+          flex-wrap: wrap; gap: 8px;
+        }
+        .brand-box { display: flex; align-items: center; gap: 10px; }
+        .logo-badge {
+          width: 32px; height: 32px; border-radius: 8px; background: #3b82f6;
+          display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;
+        }
+        .brand-title { margin: 0; font-size: 15px; font-weight: 700; }
+        .nav-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.1); padding: 3px; border-radius: 8px; }
+        .tab-btn {
+          border: none; background: transparent; color: #cbd5e1; padding: 6px 10px;
+          border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+        }
+        .tab-btn.active { background: #3b82f6; color: #fff; }
+
+        /* Thanh công cụ mỏng gọn */
+        .compact-toolbar {
+          background: #fff; padding: 8px 12px; border-bottom: 1px solid #cbd5e1;
+          display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+        }
+        .tool-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .btn {
+          border: none; border-radius: 6px; padding: 6px 10px; font-size: 12px;
+          font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+        }
+        .btn-blue { background: #2563eb; color: #fff; }
+        .btn-gray { background: #e2e8f0; color: #1e293b; }
+        .btn-green { background: #16a34a; color: #fff; }
+        .btn-emerald { background: #059669; color: #fff; }
+        .btn-orange { background: #ea580c; color: #fff; }
+        .btn-dark { background: #1e293b; color: #fff; }
+
+        .date-nav {
+          display: flex; align-items: center; gap: 4px; background: #f8fafc;
+          border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px 4px;
+        }
+        .date-input {
+          border: none; background: transparent; font-size: 12.5px; font-weight: 700;
+          color: #0f172a; outline: none; width: 112px;
+        }
+
+        /* Bảng Lịch Chính */
+        .board-container { flex: 1; padding: 6px; overflow-x: auto; }
+        .schedule-banner {
+          background: #fef08a; border: 1px solid #eab308; border-bottom: none;
+          padding: 6px 12px; display: flex; justify-content: space-between; align-items: center;
+          flex-wrap: wrap; gap: 6px; border-radius: 8px 8px 0 0; font-size: 13.5px; font-weight: 800;
+        }
+        .summary-pills { display: flex; gap: 8px; font-size: 12px; font-weight: 700; align-items: center; }
+
+        .pt-table {
+          width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #94a3b8;
+        }
+        .pt-table.fit-mode { table-layout: fixed; }
+        .pt-table.scroll-mode { table-layout: auto; min-width: 980px; }
+
+        .pt-table th, .pt-table td {
+          border: 1px solid #cbd5e1; padding: 4px 5px; vertical-align: middle;
+          word-break: break-word; overflow-wrap: anywhere;
+        }
+        .col-index { width: 32px; text-align: center; font-weight: 700; font-size: 12px; background: #fef9c3; }
+        .th-trainer { background: #fef9c3; text-align: center; padding: 6px 4px !important; }
+        .trainer-title { font-size: 13px; font-weight: 800; color: #0f172a; line-height: 1.2; margin-bottom: 4px; }
+        .trainer-btns { display: flex; justify-content: center; gap: 3px; flex-wrap: wrap; }
+        .mini-btn {
+          border: none; border-radius: 4px; padding: 2px 5px; font-size: 10px;
+          font-weight: 700; cursor: pointer;
+        }
+
+        /* Thẻ khách trong từng ô: tự động xuống dòng, không bao giờ mất chữ */
+        .cell-chip {
+          display: flex; justify-content: space-between; align-items: center;
+          background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 5px;
+          padding: 3px 5px; cursor: pointer; gap: 3px; min-height: 28px;
+        }
+        .cell-chip.cancelled { background: #f1f5f9; border-color: #cbd5e1; opacity: 0.7; }
+        .cell-chip.completed { background: #ecfdf5; border-color: #6ee7b7; }
+        .cell-chip.off { background: #fef3c7; border-color: #fcd34d; justify-content: center; }
+
+        .chip-text {
+          font-size: 12.5px; font-weight: 600; color: #0f172a; line-height: 1.25;
+          text-align: left; flex: 1;
+        }
+        .chip-time {
+          color: #1d4ed8; font-weight: 800; font-size: 11.5px; margin-left: 3px;
+        }
+        .strike-x {
+          border: none; background: transparent; color: #94a3b8; font-size: 11px;
+          padding: 0 2px; cursor: pointer; flex-shrink: 0;
+        }
+
+        .footer-row { background: #0f172a; color: #fff; font-weight: 800; text-align: center; }
+        .footer-badge {
+          display: inline-block; background: #22c55e; color: #fff;
+          font-size: 13px; font-weight: 800; padding: 2px 8px; border-radius: 12px;
+        }
+
+        /* Tối ưu riêng cho màn hình Điện Thoại */
+        @media (max-width: 768px) {
+          .top-header { padding: 6px 8px; }
+          .brand-title { font-size: 13px; }
+          .tab-btn { padding: 5px 7px; font-size: 11px; }
+          .compact-toolbar { padding: 6px 8px; gap: 5px; }
+          .btn { padding: 5px 7px; font-size: 11px; }
+          .board-container { padding: 2px; }
+          .schedule-banner { padding: 5px 8px; font-size: 12px; }
+
+          .col-index { width: 22px; font-size: 10px; padding: 2px !important; }
+          .pt-table th, .pt-table td { padding: 2px 2px !important; }
+          .trainer-title { font-size: 10.5px; margin-bottom: 2px; }
+          .mini-btn { font-size: 8.5px; padding: 1px 3px; }
+          .cell-chip { padding: 2px 3px; min-height: 24px; border-radius: 4px; }
+          .chip-text { font-size: 10px; line-height: 1.15; }
+          .chip-time { font-size: 9.5px; margin-left: 2px; }
+          .strike-x { font-size: 9px; padding: 0; }
+          .footer-badge { font-size: 11px; padding: 1px 5px; }
+        }
+      `}</style>
+
+      {/* Ẩn Header khi bật chế độ Full Màn Hình Bảng Lịch */}
+      {!isFullscreenBoard && (
+        <header className="top-header">
+          <div className="brand-box">
+            <div className="logo-badge">LN</div>
+            <h1 className="brand-title">LN TRAINING — LỊCH & CHỐT CA PT</h1>
           </div>
-        </div>
 
-        <div style={styles.navPills}>
-          <button
-            onClick={() => setActiveTab('DAILY')}
-            style={activeTab === 'DAILY' ? styles.pillActive : styles.pillBtn}
-          >
-            📅 Lịch Mỗi Ngày
-          </button>
-          <button
-            onClick={() => setActiveTab('CLIENTS')}
-            style={activeTab === 'CLIENTS' ? styles.pillActive : styles.pillBtn}
-          >
-            👥 Lịch Tuần ({clients.length})
-          </button>
-          <button
-            onClick={() => { setActiveTab('SUMMARY'); loadWeeklySummary(); }}
-            style={activeTab === 'SUMMARY' ? styles.pillActive : styles.pillBtn}
-          >
-            📊 Tổng Hợp Tuần
-          </button>
-        </div>
-      </header>
+          <div className="nav-tabs">
+            <button
+              onClick={() => setActiveTab('DAILY')}
+              className={`tab-btn ${activeTab === 'DAILY' ? 'active' : ''}`}
+            >
+              📅 Lịch Ngày
+            </button>
+            <button
+              onClick={() => setActiveTab('CLIENTS')}
+              className={`tab-btn ${activeTab === 'CLIENTS' ? 'active' : ''}`}
+            >
+              👥 Lịch Tuần ({clients.length})
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('SUMMARY');
+                loadWeeklySummary();
+              }}
+              className={`tab-btn ${activeTab === 'SUMMARY' ? 'active' : ''}`}
+            >
+              📊 Tổng Hợp Tuần
+            </button>
+          </div>
+        </header>
+      )}
 
-      {/* ==================== TAB 1: LỊCH MỖI NGÀY ==================== */}
+      {/* ==================== TAB 1: BẢNG LỊCH MỖI NGÀY ==================== */}
       {activeTab === 'DAILY' && (
-        <main style={styles.mainContent}>
-          {/* 4 Thẻ thống kê nhanh trong ngày */}
-          <div style={styles.statsGrid}>
-            <div style={styles.statCard}>
-              <span style={styles.statLabel}>Ngày đang chọn</span>
-              <strong style={styles.statValue}>{formatHeaderDate(selectedDate).replace('Lịch PT ', '')}</strong>
-            </div>
-            <div style={styles.statCard}>
-              <span style={styles.statLabel}>Tổng ca tính công</span>
-              <strong style={{ ...styles.statValue, color: '#2563eb' }}>{totalValidShifts} ca</strong>
-            </div>
-            <div style={styles.statCard}>
-              <span style={styles.statLabel}>Khách báo hủy (Gạch ca)</span>
-              <strong style={{ ...styles.statValue, color: '#e11d48' }}>{totalCancelledShifts} ca</strong>
-            </div>
-            <div style={styles.statCard}>
-              <span style={styles.statLabel}>Trạng thái sổ cuối ngày</span>
-              <strong style={{ ...styles.statValue, color: isDayLocked ? '#16a34a' : '#d97706' }}>
-                {isDayLocked ? '🔒 Đã chốt sổ' : `🔓 Đang mở (${totalOffTrainers} PT OFF)`}
-              </strong>
-            </div>
-          </div>
+        <>
+          {!isFullscreenBoard && (
+            <div className="compact-toolbar">
+              <div className="tool-group">
+                {/* Bộ chọn ngày + Nút Hôm nay */}
+                <div className="date-nav">
+                  <button onClick={() => changeDayBy(-1)} className="btn btn-gray" title="Hôm trước">
+                    ◀
+                  </button>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={e => setSelectedDate(e.target.value)}
+                    className="date-input"
+                  />
+                  <button onClick={() => changeDayBy(1)} className="btn btn-gray" title="Hôm sau">
+                    ▶
+                  </button>
+                  <button
+                    onClick={() => setSelectedDate(getTodayStr())}
+                    className="btn btn-blue"
+                    style={{ padding: '4px 7px', fontSize: '11px' }}
+                  >
+                    Hôm nay
+                  </button>
+                </div>
 
-          {/* Thanh công cụ thao tác */}
-          <div style={styles.toolbar}>
-            <div style={styles.toolbarLeft}>
-              <div style={styles.datePickerWrap}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Ngày:</span>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={e => setSelectedDate(e.target.value)}
-                  style={styles.dateInput}
-                />
+                <button
+                  onClick={() => openQuickAddForTrainer(trainers[0]?._id || '')}
+                  className="btn btn-blue"
+                >
+                  + Thêm Ca
+                </button>
+
+                <button onClick={handleResyncFromWeekly} className="btn btn-gray">
+                  🔄 Đồng Bộ Tuần
+                </button>
               </div>
 
-              <button
-                onClick={() => openQuickAddForTrainer(trainers[0]?._id || '')}
-                style={styles.btnPrimary}
-              >
-                + Thêm Ca Tập Mới
-              </button>
-
-              <button onClick={handleResyncFromWeekly} style={styles.btnOutline}>
-                🔄 Đồng Bộ Từ Lịch Tuần
-              </button>
-
-              <label style={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={autoSortTime}
-                  onChange={e => setAutoSortTime(e.target.checked)}
-                />
-                Sắp xếp ca từ sáng đến tối
-              </label>
-            </div>
-
-            <div style={styles.toolbarRight}>
-              <button onClick={exportDailyToExcel} style={styles.btnExcel}>
-                📥 Xuất Excel Ngày
-              </button>
-
-              {!isDayLocked ? (
-                <button onClick={handleCloseDay} style={styles.btnSuccess}>
-                  ✅ Chốt Ca Cuối Ngày
+              <div className="tool-group">
+                {/* Nút chuyển đổi giữa Vừa Khít Màn Hình và Cuộn Ngang */}
+                <button
+                  onClick={() => setFitScreen(!fitScreen)}
+                  className="btn btn-dark"
+                  title="Thu gọn tất cả cột vừa khít màn hình hoặc mở rộng để cuộn ngang"
+                >
+                  {fitScreen ? '↔️ Mở Rộng Cột' : '📐 Vừa Khít Màn Hình'}
                 </button>
-              ) : (
-                <button onClick={handleReopenDay} style={styles.btnWarning}>
-                  🔓 Mở Khóa Sửa Lịch
-                </button>
-              )}
-            </div>
-          </div>
 
-          {/* Bảng lịch hiện đại tự động mở rộng khi > 10 khách */}
-          <div style={styles.tableCard}>
-            <div style={styles.tableBanner}>
+                <button onClick={exportDailyToExcel} className="btn btn-emerald">
+                  📥 Xuất Excel
+                </button>
+
+                {!isDayLocked ? (
+                  <button onClick={handleCloseDay} className="btn btn-green">
+                    ✅ Chốt Ca
+                  </button>
+                ) : (
+                  <button onClick={handleReopenDay} className="btn btn-orange">
+                    🔓 Mở Khóa
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Khung Bảng Xếp Lịch Full Màn Hình */}
+          <div className="board-container">
+            <div className="schedule-banner">
               <span>{formatHeaderDate(selectedDate)}</span>
-              <span style={styles.rowIndicator}>
-                Hiển thị {dynamicRowCount} dòng (Tự động mở rộng khi PT có trên 10 khách)
-              </span>
+
+              <div className="summary-pills">
+                <span style={{ color: '#1d4ed8' }}>Tổng chốt: {totalValidShifts} ca</span>
+                <span>•</span>
+                <span style={{ color: '#e11d48' }}>Hủy: {totalCancelledShifts}</span>
+                <span>•</span>
+                <span style={{ color: isDayLocked ? '#16a34a' : '#b45309' }}>
+                  {isDayLocked ? '🔒 Đã chốt' : '🔓 Đang mở'}
+                </span>
+
+                <button
+                  onClick={() => setIsFullscreenBoard(!isFullscreenBoard)}
+                  className="btn btn-dark"
+                  style={{ padding: '3px 8px', fontSize: '11px' }}
+                >
+                  {isFullscreenBoard ? '✕ Thoát Full' : '⛶ Full Màn Hình'}
+                </button>
+              </div>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
-              <table style={styles.gridTable}>
-                <thead>
-                  <tr>
-                    <th style={styles.thIndex}>Ca</th>
-                    {trainers.map(trainer => {
-                      const isOff = sessions.some(
-                        s => s.trainerId === trainer._id && s.clientName === 'OFF'
-                      );
-                      return (
-                        <th key={trainer._id} style={styles.thTrainer}>
-                          <div style={styles.trainerHeaderBox}>
-                            <span style={styles.trainerName}>{trainer.name}</span>
-                            <div style={styles.trainerHeaderActions}>
-                              <button
-                                onClick={() => openQuickAddForTrainer(trainer._id)}
-                                style={styles.miniAddBtn}
-                                title="Thêm nhanh khách cho PT này"
-                              >
-                                + Ca
-                              </button>
-                              <button
-                                onClick={() => handleToggleTrainerOff(trainer._id)}
-                                style={isOff ? styles.miniOffActive : styles.miniOffBtn}
-                              >
-                                {isOff ? 'Đang OFF' : 'OFF'}
-                              </button>
-                            </div>
-                          </div>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {[...Array(dynamicRowCount)].map((_, rowIndex) => (
-                    <tr
-                      key={rowIndex}
-                      style={{ background: rowIndex % 2 === 0 ? '#ffffff' : '#f8fafc' }}
-                    >
-                      <td style={styles.tdIndex}>{rowIndex + 1}</td>
-                      {trainers.map(trainer => {
-                        const trainerSessions = getSortedTrainerSessions(trainer._id);
-                        const cellSession = trainerSessions[rowIndex];
-                        const isOffMarker = cellSession?.clientName === 'OFF';
-                        const isCancelled = cellSession?.status === 'CANCELLED' && !isOffMarker;
-                        const isCompleted = cellSession?.status === 'COMPLETED';
-
-                        return (
-                          <td
-                            key={trainer._id}
-                            onDragOver={e => e.preventDefault()}
-                            onDrop={e => handleDropOnTrainer(e, trainer._id)}
-                            style={styles.tdCell}
+            <table className={`pt-table ${fitScreen ? 'fit-mode' : 'scroll-mode'}`}>
+              <thead>
+                <tr>
+                  <th className="col-index">Ca</th>
+                  {trainers.map(trainer => {
+                    const isOff = sessions.some(
+                      s => s.trainerId === trainer._id && s.clientName === 'OFF'
+                    );
+                    return (
+                      <th key={trainer._id} className="th-trainer">
+                        <div className="trainer-title">{trainer.name}</div>
+                        <div className="trainer-btns">
+                          <button
+                            onClick={() => openQuickAddForTrainer(trainer._id)}
+                            className="mini-btn"
+                            style={{ background: '#2563eb', color: '#fff' }}
                           >
-                            {cellSession && (
-                              <div
-                                draggable={!cellSession.isLocked && !isOffMarker}
-                                onDragStart={e => handleDragStart(e, cellSession._id)}
-                                onClick={() => openEditModal(cellSession)}
-                                style={{
-                                  ...styles.sessionChip,
-                                  ...(isOffMarker ? styles.chipOff : {}),
-                                  ...(isCancelled ? styles.chipCancelled : {}),
-                                  ...(isCompleted ? styles.chipCompleted : {})
-                                }}
-                              >
-                                {isOffMarker ? (
-                                  <span style={styles.offBadgeText}>NGHỈ PHÉP (OFF)</span>
-                                ) : (
-                                  <>
-                                    <div style={styles.chipContent}>
-                                      <span
-                                        style={{
-                                          ...styles.clientNameText,
-                                          textDecoration: isCancelled ? 'line-through' : 'none'
-                                        }}
-                                      >
-                                        {cellSession.clientName}
-                                      </span>
-                                      <span style={styles.timeBadge}>
-                                        {cellSession.time || 'h'}
-                                      </span>
-                                    </div>
+                            +Ca
+                          </button>
+                          <button
+                            onClick={() => handleToggleTrainerOff(trainer._id)}
+                            className="mini-btn"
+                            style={{
+                              background: isOff ? '#f59e0b' : '#fff',
+                              color: isOff ? '#fff' : '#475569',
+                              border: '1px solid #94a3b8'
+                            }}
+                          >
+                            OFF
+                          </button>
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
 
-                                    {!cellSession.isLocked && (
-                                      <button
-                                        onClick={e => handleQuickToggleCancel(cellSession, e)}
-                                        title={isCancelled ? 'Khôi phục ca' : 'Gạch ngang hủy ca'}
-                                        style={styles.strikeBtn}
-                                      >
-                                        {isCancelled ? '↺' : '✕'}
-                                      </button>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
+              <tbody>
+                {[...Array(dynamicRowCount)].map((_, rowIndex) => (
+                  <tr
+                    key={rowIndex}
+                    style={{ background: rowIndex % 2 === 0 ? '#ffffff' : '#f8fafc' }}
+                  >
+                    <td className="col-index" style={{ background: '#f8fafc', color: '#64748b' }}>
+                      {rowIndex + 1}
+                    </td>
 
-                  {/* Dòng Chốt Ca Cuối Bảng */}
-                  <tr style={styles.footerRow}>
-                    <td style={styles.footerLabel}>Chốt ca</td>
                     {trainers.map(trainer => {
-                      const validCount = sessions.filter(
-                        s => s.trainerId === trainer._id && s.status !== 'CANCELLED'
-                      ).length;
+                      const trainerSessions = getSortedTrainerSessions(trainer._id);
+                      const cellSession = trainerSessions[rowIndex];
+                      const isOffMarker = cellSession?.clientName === 'OFF';
+                      const isCancelled = cellSession?.status === 'CANCELLED' && !isOffMarker;
+                      const isCompleted = cellSession?.status === 'COMPLETED';
+
                       return (
-                        <td key={trainer._id} style={styles.footerCountCell}>
-                          <span style={styles.footerBadge}>{validCount}</span>
+                        <td
+                          key={trainer._id}
+                          onDragOver={e => e.preventDefault()}
+                          onDrop={e => handleDropOnTrainer(e, trainer._id)}
+                        >
+                          {cellSession && (
+                            <div
+                              draggable={!cellSession.isLocked && !isOffMarker}
+                              onDragStart={e => handleDragStart(e, cellSession._id)}
+                              onClick={() => openEditModal(cellSession)}
+                              className={`cell-chip ${isOffMarker ? 'off' : ''} ${
+                                isCancelled ? 'cancelled' : ''
+                              } ${isCompleted ? 'completed' : ''}`}
+                            >
+                              {isOffMarker ? (
+                                <span style={{ fontSize: '11px', fontWeight: 800, color: '#b45309' }}>
+                                  OFF
+                                </span>
+                              ) : (
+                                <>
+                                  <div
+                                    className="chip-text"
+                                    style={{
+                                      textDecoration: isCancelled ? 'line-through' : 'none'
+                                    }}
+                                  >
+                                    {cellSession.clientName}
+                                    <span className="chip-time">
+                                      ({cellSession.time || 'h'})
+                                    </span>
+                                  </div>
+
+                                  {!cellSession.isLocked && (
+                                    <button
+                                      onClick={e => handleQuickToggleCancel(cellSession, e)}
+                                      className="strike-x"
+                                      title={isCancelled ? 'Khôi phục' : 'Gạch hủy ca'}
+                                    >
+                                      {isCancelled ? '↺' : '✕'}
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
                         </td>
                       );
                     })}
                   </tr>
-                </tbody>
-              </table>
-            </div>
+                ))}
+
+                {/* Dòng Chốt Ca Cuối Bảng */}
+                <tr className="footer-row">
+                  <td style={{ fontSize: '11px', padding: '6px 2px' }}>Chốt</td>
+                  {trainers.map(trainer => {
+                    const validCount = sessions.filter(
+                      s => s.trainerId === trainer._id && s.status !== 'CANCELLED'
+                    ).length;
+                    return (
+                      <td key={trainer._id} style={{ padding: '6px 2px' }}>
+                        <span className="footer-badge">{validCount}</span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </main>
+        </>
       )}
 
-      {/* ==================== TAB 2: QUẢN LÝ LỊCH TUẦN KHÁCH HÀNG ==================== */}
+      {/* ==================== TAB 2: QUẢN LÝ LỊCH TUẦN ==================== */}
       {activeTab === 'CLIENTS' && (
-        <main style={styles.mainContent}>
-          <div style={styles.toolbar}>
-            <div style={styles.toolbarLeft}>
+        <div style={{ padding: '10px' }}>
+          <div className="compact-toolbar" style={{ borderRadius: '8px', marginBottom: '10px' }}>
+            <div className="tool-group">
               <select
                 value={filterTrainer}
                 onChange={e => setFilterTrainer(e.target.value)}
-                style={styles.selectInput}
+                style={styles.input}
               >
                 <option value="ALL">Tất cả PT ({clients.length} khách)</option>
                 {trainers.map(t => (
@@ -542,10 +721,10 @@ export default function App() {
 
               <input
                 type="text"
-                placeholder="🔍 Tìm tên khách hàng..."
+                placeholder="🔍 Tìm tên khách..."
                 value={searchClient}
                 onChange={e => setSearchClient(e.target.value)}
-                style={{ ...styles.selectInput, width: '250px' }}
+                style={{ ...styles.input, width: '200px' }}
               />
             </div>
 
@@ -559,22 +738,22 @@ export default function App() {
                   weeklySchedule: []
                 })
               }
-              style={styles.btnPrimary}
+              className="btn btn-blue"
             >
-              + Thêm Khách Hàng Mới
+              + Thêm Khách Mới
             </button>
           </div>
 
-          <div style={styles.tableCard}>
-            <table style={styles.gridTable}>
+          <div style={{ overflowX: 'auto', background: '#fff', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+            <table className="pt-table">
               <thead>
-                <tr>
-                  <th style={styles.thClient}>Khách Hàng</th>
-                  <th style={styles.thClient}>PT Quản Lý</th>
-                  <th style={styles.thClient}>Trạng Thái</th>
-                  <th style={styles.thClient}>Lịch Cố Định Trong Tuần</th>
-                  <th style={styles.thClient}>Ghi Chú Gói Tập</th>
-                  <th style={styles.thClient}>Thao Tác</th>
+                <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
+                  <th style={{ padding: '8px' }}>Khách Hàng</th>
+                  <th style={{ padding: '8px' }}>PT Quản Lý</th>
+                  <th style={{ padding: '8px' }}>Trạng Thái</th>
+                  <th style={{ padding: '8px' }}>Lịch Tập Cố Định</th>
+                  <th style={{ padding: '8px' }}>Ghi Chú</th>
+                  <th style={{ padding: '8px' }}>Sửa</th>
                 </tr>
               </thead>
               <tbody>
@@ -582,27 +761,46 @@ export default function App() {
                   .filter(c => filterTrainer === 'ALL' || (c.primaryTrainerId?._id || c.primaryTrainerId) === filterTrainer)
                   .filter(c => c.name.toLowerCase().includes(searchClient.toLowerCase()))
                   .map(client => (
-                    <tr key={client._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={styles.tdClient}><strong>{client.name}</strong></td>
-                      <td style={styles.tdClient}>{client.primaryTrainerId?.name || '—'}</td>
-                      <td style={styles.tdClient}>
-                        <span style={client.status === 'ACTIVE' ? styles.statusActive : styles.statusPaused}>
-                          {client.status === 'ACTIVE' ? 'Đang tập' : 'Tạm nghỉ (Off)'}
+                    <tr key={client._id}>
+                      <td style={{ padding: '8px', fontWeight: 700 }}>{client.name}</td>
+                      <td style={{ padding: '8px' }}>{client.primaryTrainerId?.name || '—'}</td>
+                      <td style={{ padding: '8px' }}>
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            background: client.status === 'ACTIVE' ? '#dcfce7' : '#fef3c7',
+                            color: client.status === 'ACTIVE' ? '#166534' : '#92400e'
+                          }}
+                        >
+                          {client.status === 'ACTIVE' ? 'Đang tập' : 'Tạm nghỉ'}
                         </span>
                       </td>
-                      <td style={styles.tdClient}>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      <td style={{ padding: '8px' }}>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                           {client.weeklySchedule
                             ?.sort((a, b) => a.dayOfWeek - b.dayOfWeek)
                             .map((slot, idx) => (
-                              <span key={idx} style={styles.dayPill}>
-                                T{slot.dayOfWeek}: {slot.time || 'Báo sau'}
+                              <span
+                                key={idx}
+                                style={{
+                                  background: '#e0f2fe',
+                                  color: '#0369a1',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 700
+                                }}
+                              >
+                                T{slot.dayOfWeek}: {slot.time || 'báo sau'}
                               </span>
                             ))}
                         </div>
                       </td>
-                      <td style={styles.tdClient}>{client.packageNote}</td>
-                      <td style={styles.tdClient}>
+                      <td style={{ padding: '8px', fontSize: '12px' }}>{client.packageNote}</td>
+                      <td style={{ padding: '8px' }}>
                         <button
                           onClick={() =>
                             setEditingClient({
@@ -610,9 +808,9 @@ export default function App() {
                               primaryTrainerId: client.primaryTrainerId?._id || client.primaryTrainerId
                             })
                           }
-                          style={styles.btnEditSmall}
+                          className="btn btn-gray"
                         >
-                          ✏️ Sửa lịch tuần
+                          ✏️ Sửa
                         </button>
                       </td>
                     </tr>
@@ -620,56 +818,65 @@ export default function App() {
               </tbody>
             </table>
           </div>
-        </main>
+        </div>
       )}
 
       {/* ==================== TAB 3: TỔNG HỢP CUỐI TUẦN ==================== */}
       {activeTab === 'SUMMARY' && (
-        <main style={styles.mainContent}>
-          <div style={styles.toolbar}>
-            <div style={styles.toolbarLeft}>
-              <div style={styles.datePickerWrap}>
-                <span>Từ ngày:</span>
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={styles.dateInput} />
-              </div>
-              <div style={styles.datePickerWrap}>
-                <span>Đến ngày:</span>
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={styles.dateInput} />
-              </div>
-              <button onClick={loadWeeklySummary} style={styles.btnPrimary}>
-                🔍 Lọc Dữ Liệu
+        <div style={{ padding: '10px' }}>
+          <div className="compact-toolbar" style={{ borderRadius: '8px', marginBottom: '10px' }}>
+            <div className="tool-group">
+              <span style={{ fontSize: '12.5px', fontWeight: 600 }}>Từ:</span>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={styles.input} />
+              <span style={{ fontSize: '12.5px', fontWeight: 600 }}>Đến:</span>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={styles.input} />
+              <button onClick={loadWeeklySummary} className="btn btn-blue">
+                🔍 Xem Tổng Hợp
               </button>
             </div>
 
-            <button onClick={exportWeeklyToExcel} style={styles.btnExcel}>
-              📥 Xuất Excel Tổng Hợp Tuần
+            <button onClick={exportWeeklyToExcel} className="btn btn-emerald">
+              📥 Xuất Excel Tuần
             </button>
           </div>
 
-          <div style={styles.tableCard}>
-            <table style={styles.gridTable}>
+          <div style={{ overflowX: 'auto', background: '#fff', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+            <table className="pt-table">
               <thead>
-                <tr>
-                  <th style={styles.thClient}>Huấn Luyện Viên (PT)</th>
-                  <th style={styles.thClient}>Chi Tiết Các Ngày Đã Chốt Sổ</th>
-                  <th style={styles.thClient}>Tổng Số Ca Trong Tuần</th>
+                <tr style={{ background: '#fef08a', textAlign: 'left' }}>
+                  <th style={{ padding: '10px' }}>Huấn Luyện Viên (PT)</th>
+                  <th style={{ padding: '10px' }}>Chi Tiết Các Ngày Đã Chốt</th>
+                  <th style={{ padding: '10px', textAlign: 'center' }}>Tổng Ca Tuần</th>
                 </tr>
               </thead>
               <tbody>
                 {trainers.map(trainer => {
                   const item = weeklySummary.find(w => w._id === trainer._id);
                   return (
-                    <tr key={trainer._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={styles.tdClient}><strong>{trainer.name}</strong></td>
-                      <td style={styles.tdClient}>
+                    <tr key={trainer._id}>
+                      <td style={{ padding: '10px', fontWeight: 700 }}>{trainer.name}</td>
+                      <td style={{ padding: '10px' }}>
                         {item?.dailyBreakdown?.map((d, i) => (
-                          <span key={i} style={{ ...styles.dayPill, marginRight: '8px' }}>
-                            Ngày {d.date.slice(5)}: <strong>{d.count} ca</strong>
+                          <span
+                            key={i}
+                            style={{
+                              background: '#e0f2fe',
+                              color: '#0369a1',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              marginRight: '6px',
+                              display: 'inline-block',
+                              marginBottom: '4px'
+                            }}
+                          >
+                            {d.date.slice(5)}: {d.count} ca
                           </span>
-                        )) || <span style={{ color: '#94a3b8' }}>Chưa có dữ liệu chốt ca</span>}
+                        )) || <span style={{ color: '#94a3b8', fontSize: '12px' }}>Chưa có ngày chốt ca</span>}
                       </td>
-                      <td style={styles.tdClient}>
-                        <span style={styles.totalWeekBadge}>{item ? item.totalShifts : 0} ca</span>
+                      <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, fontSize: '15px' }}>
+                        {item ? item.totalShifts : 0} ca
                       </td>
                     </tr>
                   );
@@ -677,14 +884,14 @@ export default function App() {
               </tbody>
             </table>
           </div>
-        </main>
+        </div>
       )}
 
       {/* ==================== MODAL XẾP LẠI LỊCH ==================== */}
       {editingSession && (
         <div style={styles.modalBackdrop}>
           <form onSubmit={handleSaveReschedule} style={styles.modalCard}>
-            <h3 style={styles.modalTitle}>Xếp Lại Ca Tập: {editingSession.clientName}</h3>
+            <h3 style={styles.modalTitle}>Xếp Lại Ca: {editingSession.clientName}</h3>
 
             <label style={styles.fieldGroup}>
               <span>Tên khách hiển thị:</span>
@@ -692,26 +899,26 @@ export default function App() {
                 type="text"
                 value={editForm.clientName}
                 onChange={e => setEditForm({ ...editForm, clientName: e.target.value })}
-                style={styles.selectInput}
+                style={styles.input}
               />
             </label>
 
             <label style={styles.fieldGroup}>
-              <span>Khung giờ tập (VD: 7h30, 15h, 18h45):</span>
+              <span>Giờ tập (VD: 7h30, 15h, 18h45):</span>
               <input
                 type="text"
                 value={editForm.time}
                 onChange={e => setEditForm({ ...editForm, time: e.target.value })}
-                style={styles.selectInput}
+                style={styles.input}
               />
             </label>
 
             <label style={styles.fieldGroup}>
-              <span>PT phụ trách ca này:</span>
+              <span>PT phụ trách:</span>
               <select
                 value={editForm.trainerId}
                 onChange={e => setEditForm({ ...editForm, trainerId: e.target.value })}
-                style={styles.selectInput}
+                style={styles.input}
               >
                 {trainers.map(t => (
                   <option key={t._id} value={t._id}>{t.name}</option>
@@ -724,7 +931,7 @@ export default function App() {
               <select
                 value={editForm.status}
                 onChange={e => setEditForm({ ...editForm, status: e.target.value })}
-                style={styles.selectInput}
+                style={styles.input}
               >
                 <option value="SCHEDULED">Đang hoạt động (Tính vào chốt ca)</option>
                 <option value="CANCELLED">Gạch ngang - Khách báo hủy (Không tính ca)</option>
@@ -732,7 +939,7 @@ export default function App() {
             </label>
 
             <div style={styles.scopePanel}>
-              <strong>Phạm vi cập nhật:</strong>
+              <strong>Phạm vi áp dụng:</strong>
               <label style={styles.radioRow}>
                 <input
                   type="radio"
@@ -752,15 +959,15 @@ export default function App() {
             </div>
 
             <div style={styles.modalFooter}>
-              <button type="button" onClick={handleDeleteSession} style={styles.btnDanger}>
-                🗑 Xóa ca này
+              <button type="button" onClick={handleDeleteSession} className="btn" style={{ background: '#e11d48', color: '#fff' }}>
+                🗑 Xóa ca
               </button>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="button" onClick={() => setEditingSession(null)} style={styles.btnOutline}>
+                <button type="button" onClick={() => setEditingSession(null)} className="btn btn-gray">
                   Đóng
                 </button>
-                <button type="submit" style={styles.btnPrimary}>
-                  Lưu Thay Đổi
+                <button type="submit" className="btn btn-blue">
+                  Lưu Lại
                 </button>
               </div>
             </div>
@@ -768,11 +975,11 @@ export default function App() {
         </div>
       )}
 
-      {/* ==================== MODAL THÊM CA TẬP TRONG NGÀY ==================== */}
+      {/* ==================== MODAL THÊM CA TẬP ==================== */}
       {showAddModal && (
         <div style={styles.modalBackdrop}>
           <form onSubmit={handleAddSession} style={styles.modalCard}>
-            <h3 style={styles.modalTitle}>Thêm Ca Tập Mới ({selectedDate})</h3>
+            <h3 style={styles.modalTitle}>Thêm Ca Tập ({selectedDate})</h3>
 
             <label style={styles.fieldGroup}>
               <span>Chọn khách có sẵn (hoặc nhập tên mới ở dưới):</span>
@@ -787,7 +994,7 @@ export default function App() {
                     trainerId: found?.primaryTrainerId?._id || addForm.trainerId
                   });
                 }}
-                style={styles.selectInput}
+                style={styles.input}
               >
                 <option value="">-- Nhập tên khách mới --</option>
                 {clients.map(c => (
@@ -803,7 +1010,7 @@ export default function App() {
                 required
                 value={addForm.clientName}
                 onChange={e => setAddForm({ ...addForm, clientName: e.target.value })}
-                style={styles.selectInput}
+                style={styles.input}
               />
             </label>
 
@@ -812,7 +1019,7 @@ export default function App() {
               <select
                 value={addForm.trainerId}
                 onChange={e => setAddForm({ ...addForm, trainerId: e.target.value })}
-                style={styles.selectInput}
+                style={styles.input}
               >
                 {trainers.map(t => (
                   <option key={t._id} value={t._id}>{t.name}</option>
@@ -826,26 +1033,26 @@ export default function App() {
                 type="text"
                 value={addForm.time}
                 onChange={e => setAddForm({ ...addForm, time: e.target.value })}
-                style={styles.selectInput}
+                style={styles.input}
               />
             </label>
 
             {addForm.clientId && (
-              <label style={{ ...styles.checkboxLabel, marginTop: '8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', marginTop: '6px' }}>
                 <input
                   type="checkbox"
                   checked={addForm.saveToWeekly}
                   onChange={e => setAddForm({ ...addForm, saveToWeekly: e.target.checked })}
                 />
-                Cập nhật luôn thứ này vào Lịch Tuần cố định của khách
+                Lưu cố định thứ này vào Lịch Tuần của khách
               </label>
             )}
 
             <div style={{ ...styles.modalFooter, justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => setShowAddModal(false)} style={styles.btnOutline}>
+              <button type="button" onClick={() => setShowAddModal(false)} className="btn btn-gray">
                 Hủy
               </button>
-              <button type="submit" style={styles.btnPrimary}>
+              <button type="submit" className="btn btn-blue">
                 Thêm Vào Lịch
               </button>
             </div>
@@ -856,19 +1063,19 @@ export default function App() {
       {/* ==================== MODAL SỬA LỊCH TUẦN KHÁCH HÀNG ==================== */}
       {editingClient && (
         <div style={styles.modalBackdrop}>
-          <div style={{ ...styles.modalCard, width: '540px' }}>
+          <div style={{ ...styles.modalCard, width: '500px' }}>
             <h3 style={styles.modalTitle}>
-              {editingClient._id ? `Lịch Tuần Cố Định: ${editingClient.name}` : 'Thêm Khách Hàng Mới'}
+              {editingClient._id ? `Lịch Tuần: ${editingClient.name}` : 'Thêm Khách Hàng Mới'}
             </h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <label style={styles.fieldGroup}>
                 <span>Tên khách hàng:</span>
                 <input
                   type="text"
                   value={editingClient.name}
                   onChange={e => setEditingClient({ ...editingClient, name: e.target.value })}
-                  style={styles.selectInput}
+                  style={styles.input}
                 />
               </label>
 
@@ -877,7 +1084,7 @@ export default function App() {
                 <select
                   value={editingClient.primaryTrainerId}
                   onChange={e => setEditingClient({ ...editingClient, primaryTrainerId: e.target.value })}
-                  style={styles.selectInput}
+                  style={styles.input}
                 >
                   {trainers.map(t => (
                     <option key={t._id} value={t._id}>{t.name}</option>
@@ -886,13 +1093,13 @@ export default function App() {
               </label>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <label style={styles.fieldGroup}>
                 <span>Trạng thái:</span>
                 <select
                   value={editingClient.status}
                   onChange={e => setEditingClient({ ...editingClient, status: e.target.value })}
-                  style={styles.selectInput}
+                  style={styles.input}
                 >
                   <option value="ACTIVE">Đang tập</option>
                   <option value="PAUSED">Tạm nghỉ (Off 1 tuần)</option>
@@ -905,14 +1112,14 @@ export default function App() {
                   type="text"
                   value={editingClient.packageNote || ''}
                   onChange={e => setEditingClient({ ...editingClient, packageNote: e.target.value })}
-                  style={styles.selectInput}
+                  style={styles.input}
                 />
               </label>
             </div>
 
-            <div style={{ marginTop: '10px' }}>
-              <strong style={{ fontSize: '14px' }}>Các buổi tập cố định trong tuần:</strong>
-              <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ marginTop: '8px' }}>
+              <strong style={{ fontSize: '13px' }}>Các buổi tập cố định trong tuần:</strong>
+              <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
                 {DAYS.map(day => {
                   const slot = editingClient.weeklySchedule.find(s => s.dayOfWeek === day.num);
                   const isChecked = Boolean(slot);
@@ -922,13 +1129,13 @@ export default function App() {
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '10px',
-                        padding: '6px 10px',
+                        gap: '8px',
+                        padding: '5px 8px',
                         background: isChecked ? '#eff6ff' : '#f8fafc',
-                        borderRadius: '8px'
+                        borderRadius: '6px'
                       }}
                     >
-                      <label style={{ width: '90px', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
+                      <label style={{ width: '85px', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -956,7 +1163,7 @@ export default function App() {
                         <>
                           <input
                             type="text"
-                            placeholder="Giờ (VD: 9h)"
+                            placeholder="Giờ"
                             value={slot.time}
                             onChange={e =>
                               setEditingClient({
@@ -966,7 +1173,7 @@ export default function App() {
                                 )
                               })
                             }
-                            style={{ ...styles.selectInput, width: '120px' }}
+                            style={{ ...styles.input, width: '95px' }}
                           />
                           <select
                             value={slot.assignedTrainerId || editingClient.primaryTrainerId}
@@ -978,7 +1185,7 @@ export default function App() {
                                 )
                               })
                             }
-                            style={{ ...styles.selectInput, flex: 1 }}
+                            style={{ ...styles.input, flex: 1 }}
                           >
                             {trainers.map(t => (
                               <option key={t._id} value={t._id}>PT: {t.name}</option>
@@ -993,7 +1200,7 @@ export default function App() {
             </div>
 
             <div style={{ ...styles.modalFooter, justifyContent: 'flex-end' }}>
-              <button onClick={() => setEditingClient(null)} style={styles.btnOutline}>
+              <button onClick={() => setEditingClient(null)} className="btn btn-gray">
                 Đóng
               </button>
               <button
@@ -1006,7 +1213,7 @@ export default function App() {
                     setEditingClient(null);
                   }
                 }}
-                style={styles.btnPrimary}
+                className="btn btn-blue"
               >
                 Lưu Lịch Tuần
               </button>
@@ -1019,72 +1226,12 @@ export default function App() {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: '#f1f5f9', fontFamily: 'Inter, Segoe UI, sans-serif', color: '#0f172a' },
-  header: { background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#fff', padding: '18px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
-  brandGroup: { display: 'flex', alignItems: 'center', gap: '14px' },
-  logoBadge: { width: '44px', height: '44px', borderRadius: '12px', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '18px', letterSpacing: '1px' },
-  title: { margin: 0, fontSize: '19px', fontWeight: 700 },
-  subtitle: { margin: '3px 0 0', fontSize: '12.5px', color: '#94a3b8' },
-  navPills: { display: 'flex', background: 'rgba(255,255,255,0.08)', padding: '5px', borderRadius: '10px', gap: '6px' },
-  pillBtn: { padding: '8px 15px', border: 'none', background: 'transparent', color: '#cbd5e1', borderRadius: '7px', cursor: 'pointer', fontWeight: 500, fontSize: '13.5px' },
-  pillActive: { padding: '8px 15px', border: 'none', background: '#3b82f6', color: '#fff', borderRadius: '7px', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px', boxShadow: '0 2px 6px rgba(59,130,246,0.4)' },
-  mainContent: { padding: '22px 28px', maxWidth: '1600px', margin: '0 auto' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '18px' },
-  statCard: { background: '#fff', padding: '14px 18px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' },
-  statLabel: { fontSize: '12.5px', color: '#64748b', fontWeight: 500 },
-  statValue: { fontSize: '18px', fontWeight: 700, color: '#0f172a' },
-  toolbar: { background: '#fff', padding: '12px 18px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '18px', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' },
-  toolbarLeft: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' },
-  toolbarRight: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' },
-  datePickerWrap: { display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '5px 10px', borderRadius: '8px', border: '1px solid #cbd5e1' },
-  dateInput: { border: 'none', background: 'transparent', fontSize: '13.5px', fontWeight: 600, color: '#0f172a', outline: 'none' },
-  selectInput: { padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13.5px', outline: 'none' },
-  checkboxLabel: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 500, color: '#475569', cursor: 'pointer' },
-  btnPrimary: { padding: '9px 15px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px' },
-  btnOutline: { padding: '9px 15px', background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px' },
-  btnExcel: { padding: '9px 15px', background: '#059669', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px' },
-  btnSuccess: { padding: '9px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px' },
-  btnWarning: { padding: '9px 16px', background: '#ea580c', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px' },
-  btnDanger: { padding: '9px 14px', background: '#e11d48', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px' },
-  tableCard: { background: '#fff', borderRadius: '14px', border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.04)' },
-  tableBanner: { background: '#fef08a', padding: '10px 18px', borderBottom: '1px solid #eab308', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700, fontSize: '15px', color: '#713f12' },
-  rowIndicator: { fontSize: '12px', fontWeight: 600, background: 'rgba(255,255,255,0.7)', padding: '3px 10px', borderRadius: '20px' },
-  gridTable: { width: '100%', borderCollapse: 'collapse' },
-  thIndex: { width: '54px', background: '#fef9c3', borderBottom: '2px solid #cbd5e1', borderRight: '1px solid #e2e8f0', padding: '10px 6px', fontSize: '13px', fontWeight: 700, textAlign: 'center' },
-  thTrainer: { minWidth: '175px', background: '#fef9c3', borderBottom: '2px solid #cbd5e1', borderRight: '1px solid #e2e8f0', padding: '10px 8px' },
-  trainerHeaderBox: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' },
-  trainerName: { fontSize: '14.5px', fontWeight: 700, color: '#0f172a' },
-  trainerHeaderActions: { display: 'flex', gap: '6px' },
-  miniAddBtn: { fontSize: '11px', padding: '2px 8px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 600 },
-  miniOffBtn: { fontSize: '11px', padding: '2px 8px', background: '#fff', color: '#475569', border: '1px solid #94a3b8', borderRadius: '5px', cursor: 'pointer' },
-  miniOffActive: { fontSize: '11px', padding: '2px 8px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 700 },
-  tdIndex: { textAlign: 'center', fontWeight: 700, fontSize: '13px', color: '#64748b', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', padding: '6px' },
-  tdCell: { borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', padding: '5px 7px', height: '40px', verticalAlign: 'middle' },
-  sessionChip: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '5px 8px', cursor: 'pointer', gap: '6px' },
-  chipCancelled: { background: '#f1f5f9', borderColor: '#cbd5e1', opacity: 0.75 },
-  chipCompleted: { background: '#ecfdf5', borderColor: '#a7f3d0' },
-  chipOff: { background: '#fef3c7', borderColor: '#fcd34d', justifyContent: 'center' },
-  offBadgeText: { fontSize: '12px', fontWeight: 800, color: '#b45309', letterSpacing: '0.5px' },
-  chipContent: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '6px' },
-  clientNameText: { fontSize: '13.5px', fontWeight: 600, color: '#1e293b' },
-  timeBadge: { fontSize: '11.5px', fontWeight: 700, background: '#fff', color: '#1d4ed8', padding: '2px 6px', borderRadius: '5px', border: '1px solid #dbeafe', whiteSpace: 'nowrap' },
-  strikeBtn: { border: 'none', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: '12px', padding: '0 2px' },
-  footerRow: { background: '#0f172a', color: '#fff' },
-  footerLabel: { padding: '12px 8px', textAlign: 'center', fontWeight: 700, fontSize: '14px', borderRight: '1px solid #334155' },
-  footerCountCell: { padding: '10px', textAlign: 'center', borderRight: '1px solid #334155' },
-  footerBadge: { display: 'inline-block', background: '#22c55e', color: '#fff', fontWeight: 800, fontSize: '15px', padding: '3px 14px', borderRadius: '20px' },
-  thClient: { padding: '12px 14px', textAlign: 'left', background: '#f8fafc', borderBottom: '2px solid #cbd5e1', fontSize: '13.5px', fontWeight: 700 },
-  tdClient: { padding: '12px 14px', fontSize: '14px' },
-  statusActive: { background: '#dcfce7', color: '#166534', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600 },
-  statusPaused: { background: '#fef3c7', color: '#92400e', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600 },
-  dayPill: { background: '#e0f2fe', color: '#0369a1', padding: '3px 8px', borderRadius: '6px', fontSize: '12.5px', fontWeight: 600 },
-  btnEditSmall: { padding: '6px 12px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12.5px' },
-  totalWeekBadge: { background: '#1e293b', color: '#fff', padding: '5px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '14px' },
-  modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
-  modalCard: { background: '#fff', padding: '24px', borderRadius: '14px', width: '430px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 35px rgba(0,0,0,0.2)' },
-  modalTitle: { marginTop: 0, marginBottom: '16px', fontSize: '17px', fontWeight: 700 },
-  fieldGroup: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px', fontSize: '13.5px', fontWeight: 600 },
-  scopePanel: { background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13.5px', marginTop: '6px' },
-  radioRow: { display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 500 },
-  modalFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', gap: '10px' }
+  input: { padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none' },
+  modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '10px' },
+  modalCard: { background: '#fff', padding: '18px', borderRadius: '12px', width: '400px', maxWidth: '96vw', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 35px rgba(0,0,0,0.2)' },
+  modalTitle: { marginTop: 0, marginBottom: '12px', fontSize: '16px', fontWeight: 800 },
+  fieldGroup: { display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px', fontSize: '13px', fontWeight: 600 },
+  scopePanel: { background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px', marginTop: '4px' },
+  radioRow: { display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 500 },
+  modalFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', gap: '8px' }
 };
