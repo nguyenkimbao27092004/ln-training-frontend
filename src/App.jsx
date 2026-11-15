@@ -16,6 +16,24 @@ const DAYS = [
 ];
 
 const UPD_MARKER = '@@UPD:';
+const DOUBLE_MARKER = '[CA ĐÔI]';
+
+// Kiểm tra xem ca tập có phải là Ca Đôi hay không
+function isDoubleSession(sessionOrName) {
+  const name = typeof sessionOrName === 'string' ? sessionOrName : (sessionOrName?.clientName || '');
+  return name.toUpperCase().includes(DOUBLE_MARKER);
+}
+
+// Lấy tên khách sạch (bỏ nhãn [CA ĐÔI] để hiển thị đẹp trên giao diện)
+function getCleanSessionName(rawName = '') {
+  return rawName.replace(/\[CA ĐÔI\]/gi, '').trim();
+}
+
+// Gắn hoặc gỡ nhãn [CA ĐÔI] vào tên ca tập
+function formatSessionNameWithDouble(cleanName = '', isDouble = false) {
+  const pure = getCleanSessionName(cleanName);
+  return isDouble ? `${pure} ${DOUBLE_MARKER}` : pure;
+}
 
 // Tách nội dung ghi chú gốc và mốc thời gian chỉnh sửa lịch tuần
 function parseClientNoteAndTime(rawNote = '', fallbackUpdatedAt = null) {
@@ -125,7 +143,10 @@ export default function App() {
     time: '',
     clientName: '',
     status: 'SCHEDULED',
-    updateScope: 'DAILY'
+    updateScope: 'DAILY',
+    isDouble: false,
+    mergeWithSessionId: '',
+    secondClientName: ''
   });
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -133,6 +154,9 @@ export default function App() {
     trainerId: '',
     clientId: '',
     clientName: '',
+    isDouble: false,
+    secondClientId: '',
+    secondClientName: '',
     time: '',
     saveToWeekly: false
   });
@@ -216,9 +240,11 @@ export default function App() {
         } else if (s.clientName === 'OFF') {
           rowData.push('OFF');
         } else {
+          const cleanName = getCleanSessionName(s.clientName);
+          const doubleTag = isDoubleSession(s) ? ' [Ca đôi]' : '';
           const timeLabel = s.time ? ` (${s.time})` : '';
           const cancelPrefix = s.status === 'CANCELLED' ? '[HỦY] ' : '';
-          rowData.push(`${cancelPrefix}${s.clientName}${timeLabel}`);
+          rowData.push(`${cancelPrefix}${cleanName}${doubleTag}${timeLabel}`);
         }
       });
       aoa.push(rowData);
@@ -226,15 +252,19 @@ export default function App() {
 
     const footerRow = ['Chốt ca'];
     trainers.forEach(trainer => {
-      const validCount = sessions.filter(
+      const validList = sessions.filter(
         s => s.trainerId === trainer._id && s.status !== 'CANCELLED'
-      ).length;
-      footerRow.push(validCount);
+      );
+      const validCount = validList.length;
+      const doubleCount = validList.filter(s => isDoubleSession(s)).length;
+      footerRow.push(
+        doubleCount > 0 ? `${validCount} (Có ${doubleCount} ca đôi)` : `${validCount}`
+      );
     });
     aoa.push(footerRow);
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 8 }, ...trainers.map(() => ({ wch: 22 }))];
+    ws['!cols'] = [{ wch: 10 }, ...trainers.map(() => ({ wch: 24 }))];
     ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: trainers.length } }];
 
     const wb = XLSX.utils.book_new();
@@ -245,20 +275,30 @@ export default function App() {
   const exportWeeklyToExcel = () => {
     const aoa = [
       [`GYM DINHLE - TỔNG HỢP CA PT (${startDate} đến ${endDate})`],
-      ['Huấn Luyện Viên (PT)', 'Chi Tiết Các Ngày Đã Chốt', 'Tổng Số Ca']
+      ['Huấn Luyện Viên (PT)', 'Chi Tiết Các Ngày Đã Chốt', 'Tổng Số Ca', 'Ghi Chú Ca Đôi']
     ];
 
     trainers.forEach(trainer => {
       const item = weeklySummary.find(w => w._id === trainer._id);
       const detailStr =
-        item?.dailyBreakdown?.map(d => `${d.date.slice(5)}: ${d.count} ca`).join(', ') ||
-        'Chưa có ca chốt';
-      aoa.push([trainer.name, detailStr, item ? item.totalShifts : 0]);
+        item?.dailyBreakdown
+          ?.map(d => {
+            const dbl = d.doubleCount ? ` (có ${d.doubleCount} ca đôi)` : '';
+            return `${d.date.slice(5)}: ${d.count} ca${dbl}`;
+          })
+          .join(', ') || 'Chưa có ca chốt';
+      const totalDouble = item?.totalDoubleShifts || 0;
+      aoa.push([
+        trainer.name,
+        detailStr,
+        item ? item.totalShifts : 0,
+        totalDouble > 0 ? `Có ${totalDouble} ca đôi` : 'Không có'
+      ]);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 22 }, { wch: 45 }, { wch: 16 }];
-    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
+    ws['!cols'] = [{ wch: 22 }, { wch: 48 }, { wch: 15 }, { wch: 20 }];
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Tong_Hop');
@@ -277,9 +317,12 @@ export default function App() {
     setEditForm({
       trainerId: session.trainerId,
       time: session.time || '',
-      clientName: session.clientName,
+      clientName: getCleanSessionName(session.clientName),
       status: session.status,
-      updateScope: 'DAILY'
+      updateScope: 'DAILY',
+      isDouble: isDoubleSession(session),
+      mergeWithSessionId: '',
+      secondClientName: ''
     });
   };
 
@@ -296,8 +339,48 @@ export default function App() {
 
   const handleSaveReschedule = async (e) => {
     e.preventDefault();
-    const res = await axios.put(`${API_URL}/daily-session/${editingSession._id}/reschedule`, editForm);
-    setSessions(sessions.map(s => (s._id === editingSession._id ? res.data : s)));
+    let baseName = editForm.clientName.trim();
+
+    // Nếu người dùng chọn gộp với 1 ca khác trong ngày hoặc nhập thêm tên khách thứ 2
+    if (editForm.isDouble) {
+      if (editForm.mergeWithSessionId) {
+        const targetMerge = sessions.find(s => s._id === editForm.mergeWithSessionId);
+        if (targetMerge) {
+          const secondClean = getCleanSessionName(targetMerge.clientName);
+          if (!baseName.toLowerCase().includes(secondClean.toLowerCase())) {
+            baseName = `${baseName} + ${secondClean}`;
+          }
+          await axios.delete(`${API_URL}/daily-session/${targetMerge._id}`);
+        }
+      } else if (editForm.secondClientName.trim()) {
+        const secondClean = editForm.secondClientName.trim();
+        if (!baseName.toLowerCase().includes(secondClean.toLowerCase())) {
+          baseName = `${baseName} + ${secondClean}`;
+        }
+      }
+    }
+
+    const finalClientName = formatSessionNameWithDouble(baseName, editForm.isDouble);
+
+    const payload = {
+      trainerId: editForm.trainerId,
+      time: editForm.time,
+      clientName: finalClientName,
+      status: editForm.status,
+      updateScope: editForm.updateScope
+    };
+
+    const res = await axios.put(
+      `${API_URL}/daily-session/${editingSession._id}/reschedule`,
+      payload
+    );
+
+    const nextSessions = sessions
+      .filter(s => s._id !== editForm.mergeWithSessionId)
+      .map(s => (s._id === editingSession._id ? res.data : s));
+
+    setSessions(nextSessions);
+
     if (editForm.updateScope === 'WEEKLY') {
       await stampClientWeeklyUpdate(editingSession.clientId);
       await fetchInitData();
@@ -350,6 +433,9 @@ export default function App() {
       trainerId,
       clientId: '',
       clientName: '',
+      isDouble: false,
+      secondClientId: '',
+      secondClientName: '',
       time: '15h',
       saveToWeekly: false
     });
@@ -358,13 +444,30 @@ export default function App() {
 
   const handleAddSession = async (e) => {
     e.preventDefault();
+    let combinedName = addForm.clientName.trim();
+
+    if (addForm.isDouble && addForm.secondClientName.trim()) {
+      combinedName = `${combinedName} + ${addForm.secondClientName.trim()}`;
+    }
+
+    const finalClientName = formatSessionNameWithDouble(combinedName, addForm.isDouble);
+
     const res = await axios.post(`${API_URL}/daily-session/add`, {
       date: selectedDate,
-      ...addForm
+      trainerId: addForm.trainerId,
+      clientId: addForm.clientId || null,
+      clientName: finalClientName,
+      time: addForm.time,
+      saveToWeekly: addForm.saveToWeekly
     });
+
     setSessions([...sessions, res.data]);
-    if (addForm.saveToWeekly && addForm.clientId) {
-      await stampClientWeeklyUpdate(addForm.clientId);
+
+    if (addForm.saveToWeekly) {
+      if (addForm.clientId) await stampClientWeeklyUpdate(addForm.clientId);
+      if (addForm.isDouble && addForm.secondClientId) {
+        await stampClientWeeklyUpdate(addForm.secondClientId);
+      }
       await fetchInitData();
     }
     setShowAddModal(false);
@@ -431,7 +534,9 @@ export default function App() {
   };
 
   const isDayLocked = sessions.some(s => s.isLocked);
-  const totalValidShifts = sessions.filter(s => s.status !== 'CANCELLED').length;
+  const validDaySessions = sessions.filter(s => s.status !== 'CANCELLED');
+  const totalValidShifts = validDaySessions.length;
+  const totalDoubleShiftsToday = validDaySessions.filter(s => isDoubleSession(s)).length;
   const totalCancelledShifts = sessions.filter(
     s => s.status === 'CANCELLED' && s.clientName !== 'OFF'
   ).length;
@@ -587,6 +692,10 @@ export default function App() {
           border-radius: 8px; padding: 5px 8px; gap: 6px;
           cursor: pointer; transition: 0.12s;
         }
+        .SessionCard.double-shift {
+          background: #f5f3ff; border-color: #ddd6fe;
+          border-left: 4px solid #7c3aed;
+        }
         .SessionCard:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(37,99,235,0.12); }
         .SessionCard.cancelled {
           background: #f8fafc; border-color: #cbd5e1; border-left-color: #94a3b8; opacity: 0.68;
@@ -606,6 +715,12 @@ export default function App() {
           word-break: keep-all; overflow-wrap: break-word; line-height: 1.25;
           text-align: left;
         }
+        .DoubleBadge {
+          display: inline-block; background: #7c3aed; color: #fff;
+          font-size: 10px; font-weight: 800; padding: 1px 5px;
+          border-radius: 4px; margin-right: 4px; white-space: nowrap;
+          vertical-align: middle;
+        }
         .TimePill {
           background: #fff; color: #1d4ed8; border: 1px solid #bfdbfe;
           font-size: 11.5px; font-weight: 800; padding: 2px 6px;
@@ -623,11 +738,19 @@ export default function App() {
         .FooterRow td {
           background: #0f172a !important; color: #fff !important;
           padding: 10px 6px !important; text-align: center; font-weight: 800;
+          vertical-align: middle;
         }
         .FooterCountBadge {
           display: inline-block; background: #22c55e; color: #fff;
           font-size: 14px; font-weight: 800; padding: 3px 14px;
           border-radius: 20px; white-space: nowrap;
+        }
+        .FooterDoubleNote {
+          margin-top: 5px; font-size: 11px; font-weight: 700;
+          color: #fde047; background: rgba(254, 240, 138, 0.16);
+          border: 1px solid rgba(253, 224, 71, 0.4);
+          padding: 2px 7px; border-radius: 6px; display: inline-block;
+          white-space: nowrap;
         }
 
         /* CHẾ ĐỘ XEM THẺ PT */
@@ -642,6 +765,7 @@ export default function App() {
         .PTCardHeader {
           display: flex; justify-content: space-between; align-items: center;
           border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 10px;
+          flex-wrap: wrap; gap: 6px;
         }
 
         /* TAB 2 & 3: LƯỚI THẺ HIỆN ĐẠI */
@@ -765,7 +889,7 @@ export default function App() {
                   onClick={() => openQuickAddForTrainer(trainers[0]?._id || '')}
                   className="Btn BtnBlue"
                 >
-                  + Thêm Ca
+                  + Thêm Ca / Ca Đôi
                 </button>
 
                 <button onClick={handleResyncFromWeekly} className="Btn BtnLight">
@@ -807,6 +931,11 @@ export default function App() {
                   <span className="StatPill" style={{ color: '#1d4ed8' }}>
                     Tổng chốt: {totalValidShifts} ca
                   </span>
+                  {totalDoubleShiftsToday > 0 && (
+                    <span className="StatPill" style={{ color: '#6d28d9', background: '#ede9fe' }}>
+                      👥 Có {totalDoubleShiftsToday} ca đôi
+                    </span>
+                  )}
                   <span className="StatPill" style={{ color: '#e11d48' }}>
                     Hủy: {totalCancelledShifts}
                   </span>
@@ -878,6 +1007,7 @@ export default function App() {
                             const isOffMarker = cellSession?.clientName === 'OFF';
                             const isCancelled = cellSession?.status === 'CANCELLED' && !isOffMarker;
                             const isCompleted = cellSession?.status === 'COMPLETED';
+                            const isDouble = cellSession && isDoubleSession(cellSession);
 
                             return (
                               <td
@@ -890,9 +1020,11 @@ export default function App() {
                                     draggable={!cellSession.isLocked && !isOffMarker}
                                     onDragStart={e => handleDragStart(e, cellSession._id)}
                                     onClick={() => openEditModal(cellSession)}
-                                    className={`SessionCard ${isOffMarker ? 'off' : ''} ${
-                                      isCancelled ? 'cancelled' : ''
-                                    } ${isCompleted ? 'completed' : ''}`}
+                                    className={`SessionCard ${isDouble ? 'double-shift' : ''} ${
+                                      isOffMarker ? 'off' : ''
+                                    } ${isCancelled ? 'cancelled' : ''} ${
+                                      isCompleted ? 'completed' : ''
+                                    }`}
                                   >
                                     {isOffMarker ? (
                                       <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#b45309', whiteSpace: 'nowrap' }}>
@@ -907,7 +1039,10 @@ export default function App() {
                                               textDecoration: isCancelled ? 'line-through' : 'none'
                                             }}
                                           >
-                                            {cellSession.clientName}
+                                            {isDouble && (
+                                              <span className="DoubleBadge">👥 Ca đôi</span>
+                                            )}
+                                            {getCleanSessionName(cellSession.clientName)}
                                           </span>
                                           <span className="TimePill">
                                             {cellSession.time || 'h'}
@@ -933,17 +1068,28 @@ export default function App() {
                         </tr>
                       ))}
 
+                      {/* DÒNG CHỐT CA CUỐI BẢNG: HIỂN THỊ TỔNG CA (CA ĐÔI TÍNH LÀ 1) + NOTE SỐ CA ĐÔI */}
                       <tr className="FooterRow">
                         <td className="StickyCol" style={{ background: '#0f172a', color: '#fff' }}>
                           Chốt
                         </td>
                         {trainers.map(trainer => {
-                          const validCount = sessions.filter(
+                          const validList = sessions.filter(
                             s => s.trainerId === trainer._id && s.status !== 'CANCELLED'
-                          ).length;
+                          );
+                          const validCount = validList.length;
+                          const doubleCount = validList.filter(s => isDoubleSession(s)).length;
+
                           return (
                             <td key={trainer._id}>
-                              <span className="FooterCountBadge">{validCount}</span>
+                              <div>
+                                <span className="FooterCountBadge">{validCount}</span>
+                              </div>
+                              {doubleCount > 0 && (
+                                <div className="FooterDoubleNote">
+                                  📝 Có {doubleCount} ca đôi
+                                </div>
+                              )}
                             </td>
                           );
                         })}
@@ -956,13 +1102,15 @@ export default function App() {
                 <div className="TrainerCardsGrid">
                   {trainers.map(trainer => {
                     const ptSessions = getSortedTrainerSessions(trainer._id);
-                    const validCount = ptSessions.filter(s => s.status !== 'CANCELLED').length;
+                    const validList = ptSessions.filter(s => s.status !== 'CANCELLED');
+                    const validCount = validList.length;
+                    const doubleCount = validList.filter(s => isDoubleSession(s)).length;
                     const isOff = ptSessions.some(s => s.clientName === 'OFF');
 
                     return (
                       <div key={trainer._id} className="PTCard">
                         <div className="PTCardHeader">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                             <strong style={{ fontSize: '15px' }}>{trainer.name}</strong>
                             <span
                               style={{
@@ -976,6 +1124,20 @@ export default function App() {
                             >
                               Chốt: {validCount} ca
                             </span>
+                            {doubleCount > 0 && (
+                              <span
+                                style={{
+                                  background: '#ede9fe',
+                                  color: '#6d28d9',
+                                  padding: '2px 8px',
+                                  borderRadius: '12px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 800
+                                }}
+                              >
+                                📝 Có {doubleCount} ca đôi
+                              </span>
+                            )}
                           </div>
 
                           <div style={{ display: 'flex', gap: '5px' }}>
@@ -1008,13 +1170,14 @@ export default function App() {
                             {ptSessions.map((cellSession, idx) => {
                               const isOffMarker = cellSession.clientName === 'OFF';
                               const isCancelled = cellSession.status === 'CANCELLED' && !isOffMarker;
+                              const isDouble = isDoubleSession(cellSession);
                               return (
                                 <div
                                   key={cellSession._id}
                                   onClick={() => openEditModal(cellSession)}
-                                  className={`SessionCard ${isOffMarker ? 'off' : ''} ${
-                                    isCancelled ? 'cancelled' : ''
-                                  }`}
+                                  className={`SessionCard ${isDouble ? 'double-shift' : ''} ${
+                                    isOffMarker ? 'off' : ''
+                                  } ${isCancelled ? 'cancelled' : ''}`}
                                 >
                                   {isOffMarker ? (
                                     <span style={{ fontWeight: 800, color: '#b45309', fontSize: '12px' }}>
@@ -1029,7 +1192,11 @@ export default function App() {
                                             textDecoration: isCancelled ? 'line-through' : 'none'
                                           }}
                                         >
-                                          #{idx + 1}. {cellSession.clientName}
+                                          #{idx + 1}.{' '}
+                                          {isDouble && (
+                                            <span className="DoubleBadge">👥 Ca đôi</span>
+                                          )}
+                                          {getCleanSessionName(cellSession.clientName)}
                                         </span>
                                         <span className="TimePill">{cellSession.time || 'h'}</span>
                                       </div>
@@ -1258,22 +1425,34 @@ export default function App() {
           <div className="ClientCardsGrid">
             {trainers.map(trainer => {
               const item = weeklySummary.find(w => w._id === trainer._id);
+              const totalDouble = item?.totalDoubleShifts || 0;
               return (
                 <div key={trainer._id} className="ClientItemCard">
                   <div className="ClientCardTop">
                     <strong style={{ fontSize: '16px', color: '#0f172a' }}>{trainer.name}</strong>
-                    <span
-                      className="StatusBadge"
-                      style={{ background: '#0f172a', color: '#4ade80', fontSize: '13px' }}
-                    >
-                      Tổng: {item ? item.totalShifts : 0} ca
-                    </span>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      {totalDouble > 0 && (
+                        <span
+                          className="StatusBadge"
+                          style={{ background: '#ede9fe', color: '#6d28d9', fontSize: '12px' }}
+                        >
+                          📝 Có {totalDouble} ca đôi
+                        </span>
+                      )}
+                      <span
+                        className="StatusBadge"
+                        style={{ background: '#0f172a', color: '#4ade80', fontSize: '13px' }}
+                      >
+                        Tổng: {item ? item.totalShifts : 0} ca
+                      </span>
+                    </div>
                   </div>
 
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {item?.dailyBreakdown?.map((d, i) => (
                       <span key={i} className="ScheduleTag">
                         Ngày {d.date.slice(5)}: {d.count} ca
+                        {d.doubleCount ? ` (có ${d.doubleCount} ca đôi)` : ''}
                       </span>
                     )) || (
                       <span style={{ color: '#94a3b8', fontSize: '13px' }}>
@@ -1288,11 +1467,13 @@ export default function App() {
         </div>
       )}
 
-      {/* ==================== MODAL XẾP LẠI LỊCH ==================== */}
+      {/* ==================== MODAL XẾP LẠI LỊCH (CÓ TÍCH CA ĐÔI & GỘP CA) ==================== */}
       {editingSession && (
         <div style={styles.modalBackdrop}>
           <form onSubmit={handleSaveReschedule} style={styles.modalCard}>
-            <h3 style={styles.modalTitle}>Xếp Lại Ca: {editingSession.clientName}</h3>
+            <h3 style={styles.modalTitle}>
+              Xếp Lại Ca: {getCleanSessionName(editingSession.clientName)}
+            </h3>
 
             <label style={styles.fieldGroup}>
               <span>Tên khách hiển thị:</span>
@@ -1303,6 +1484,80 @@ export default function App() {
                 style={styles.input}
               />
             </label>
+
+            {/* Khung bật/tắt Ca Đôi (tính 1 ca, ghi chú ở Chốt ca) */}
+            <div
+              style={{
+                background: editForm.isDouble ? '#f5f3ff' : '#f8fafc',
+                border: editForm.isDouble ? '1.5px solid #8b5cf6' : '1px solid #cbd5e1',
+                padding: '10px 12px',
+                borderRadius: '10px',
+                marginBottom: '12px'
+              }}
+            >
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  color: editForm.isDouble ? '#6d28d9' : '#1e293b',
+                  cursor: 'pointer'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={editForm.isDouble}
+                  onChange={e => setEditForm({ ...editForm, isDouble: e.target.checked })}
+                />
+                👥 Đánh dấu là Ca Đôi (Tập 2 người — Tính 1 ca & ghi note ở Chốt ca)
+              </label>
+
+              {editForm.isDouble && (
+                <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ ...styles.fieldGroup, marginBottom: 0 }}>
+                    <span style={{ fontSize: '12px', color: '#475569' }}>
+                      🔗 Gộp chung với 1 ca khác trong ngày của PT này (sẽ gộp thành 1 ca):
+                    </span>
+                    <select
+                      value={editForm.mergeWithSessionId}
+                      onChange={e => setEditForm({ ...editForm, mergeWithSessionId: e.target.value })}
+                      style={styles.input}
+                    >
+                      <option value="">-- Không gộp (hoặc tự nhập tên khách thứ 2 ở dưới) --</option>
+                      {sessions
+                        .filter(
+                          s =>
+                            s._id !== editingSession._id &&
+                            s.trainerId === editForm.trainerId &&
+                            s.clientName !== 'OFF'
+                        )
+                        .map(s => (
+                          <option key={s._id} value={s._id}>
+                            Gộp với: {getCleanSessionName(s.clientName)} ({s.time || 'h'})
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+
+                  {!editForm.mergeWithSessionId && (
+                    <label style={{ ...styles.fieldGroup, marginBottom: 0 }}>
+                      <span style={{ fontSize: '12px', color: '#475569' }}>
+                        Hoặc nhập/chọn thêm tên khách thứ 2 tập cùng:
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="VD: Khánh trinh (bỏ trống nếu tên trên đã có đủ 2 người)"
+                        value={editForm.secondClientName}
+                        onChange={e => setEditForm({ ...editForm, secondClientName: e.target.value })}
+                        style={styles.input}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+            </div>
 
             <label style={styles.fieldGroup}>
               <span>Giờ tập (VD: 7h30, 15h, 18h45):</span>
@@ -1381,14 +1636,44 @@ export default function App() {
         </div>
       )}
 
-      {/* ==================== MODAL THÊM CA TẬP ==================== */}
+      {/* ==================== MODAL THÊM CA TẬP (HỖ TRỢ XẾP CA ĐÔI) ==================== */}
       {showAddModal && (
         <div style={styles.modalBackdrop}>
           <form onSubmit={handleAddSession} style={styles.modalCard}>
             <h3 style={styles.modalTitle}>Thêm Ca Tập ({selectedDate})</h3>
 
+            {/* Nút tích chọn Ca Đôi */}
+            <div
+              style={{
+                background: addForm.isDouble ? '#f5f3ff' : '#f8fafc',
+                border: addForm.isDouble ? '1.5px solid #8b5cf6' : '1px solid #cbd5e1',
+                padding: '10px 12px',
+                borderRadius: '10px',
+                marginBottom: '12px'
+              }}
+            >
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  color: addForm.isDouble ? '#6d28d9' : '#1e293b',
+                  cursor: 'pointer'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={addForm.isDouble}
+                  onChange={e => setAddForm({ ...addForm, isDouble: e.target.checked })}
+                />
+                👥 Xếp Ca Đôi (2 khách tập chung — Tính 1 ca & ghi note ở Chốt ca)
+              </label>
+            </div>
+
             <label style={styles.fieldGroup}>
-              <span>Chọn khách có sẵn (hoặc nhập tên mới ở dưới):</span>
+              <span>{addForm.isDouble ? 'Chọn khách thứ 1:' : 'Chọn khách có sẵn (hoặc nhập tên mới):'}</span>
               <select
                 value={addForm.clientId}
                 onChange={e => {
@@ -1410,15 +1695,61 @@ export default function App() {
             </label>
 
             <label style={styles.fieldGroup}>
-              <span>Tên khách hàng:</span>
+              <span>{addForm.isDouble ? 'Tên khách thứ 1:' : 'Tên khách hàng:'}</span>
               <input
                 type="text"
                 required
+                placeholder="VD: a Cường"
                 value={addForm.clientName}
                 onChange={e => setAddForm({ ...addForm, clientName: e.target.value })}
                 style={styles.input}
               />
             </label>
+
+            {/* Nếu bật Ca Đôi thì hiện thêm ô chọn/nhập Khách thứ 2 */}
+            {addForm.isDouble && (
+              <div
+                style={{
+                  background: '#faf5ff',
+                  border: '1px dashed #a855f7',
+                  padding: '10px',
+                  borderRadius: '8px',
+                  marginBottom: '12px'
+                }}
+              >
+                <label style={styles.fieldGroup}>
+                  <span>Chọn khách thứ 2 tập cùng (tùy chọn):</span>
+                  <select
+                    value={addForm.secondClientId}
+                    onChange={e => {
+                      const found2 = clients.find(c => c._id === e.target.value);
+                      setAddForm({
+                        ...addForm,
+                        secondClientId: e.target.value,
+                        secondClientName: found2 ? found2.name : addForm.secondClientName
+                      });
+                    }}
+                    style={styles.input}
+                  >
+                    <option value="">-- Tự gõ tên khách thứ 2 ở dưới --</option>
+                    {clients.map(c => (
+                      <option key={c._id} value={c._id}>{c.name}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label style={{ ...styles.fieldGroup, marginBottom: 0 }}>
+                  <span>Tên khách thứ 2 tập cùng:</span>
+                  <input
+                    type="text"
+                    placeholder="VD: Khánh trinh"
+                    value={addForm.secondClientName}
+                    onChange={e => setAddForm({ ...addForm, secondClientName: e.target.value })}
+                    style={styles.input}
+                  />
+                </label>
+              </div>
+            )}
 
             <label style={styles.fieldGroup}>
               <span>PT đứng lớp:</span>
@@ -1459,7 +1790,7 @@ export default function App() {
                 Hủy
               </button>
               <button type="submit" className="Btn BtnBlue">
-                Thêm Vào Lịch
+                {addForm.isDouble ? '👥 Thêm Ca Đôi' : 'Thêm Vào Lịch'}
               </button>
             </div>
           </form>
@@ -1655,7 +1986,7 @@ export default function App() {
 const styles = {
   input: { padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', background: '#fff', color: '#0f172a' },
   modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' },
-  modalCard: { background: '#fff', color: '#0f172a', padding: '20px', borderRadius: '14px', width: '420px', maxWidth: '96vw', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 35px rgba(0,0,0,0.25)', textAlign: 'left' },
+  modalCard: { background: '#fff', color: '#0f172a', padding: '20px', borderRadius: '14px', width: '440px', maxWidth: '96vw', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 35px rgba(0,0,0,0.25)', textAlign: 'left' },
   modalTitle: { marginTop: 0, marginBottom: '14px', fontSize: '16.5px', fontWeight: 800, color: '#0f172a' },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px', fontSize: '13px', fontWeight: 600, color: '#1e293b' },
   scopePanel: { background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', marginTop: '4px', color: '#1e293b' },
