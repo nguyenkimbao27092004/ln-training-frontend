@@ -15,6 +15,42 @@ const DAYS = [
   { num: 8, label: 'Chủ Nhật' }
 ];
 
+const UPD_MARKER = '@@UPD:';
+
+// Tách nội dung ghi chú gốc và mốc thời gian chỉnh sửa lịch tuần
+function parseClientNoteAndTime(rawNote = '', fallbackUpdatedAt = null) {
+  if (!rawNote) {
+    return { cleanNote: '', updatedAt: fallbackUpdatedAt };
+  }
+  const idx = rawNote.indexOf(UPD_MARKER);
+  if (idx === -1) {
+    return { cleanNote: rawNote, updatedAt: fallbackUpdatedAt };
+  }
+  const cleanNote = rawNote.slice(0, idx).trim();
+  const isoTime = rawNote.slice(idx + UPD_MARKER.length).trim();
+  return { cleanNote, updatedAt: isoTime || fallbackUpdatedAt };
+}
+
+// Đính kèm mốc thời gian hiện tại khi lưu lịch tuần
+function attachUpdateTimestamp(cleanNote = '') {
+  const pureNote = parseClientNoteAndTime(cleanNote).cleanNote;
+  const nowIso = new Date().toISOString();
+  return `${pureNote}${UPD_MARKER}${nowIso}`;
+}
+
+// Định dạng hiển thị Giờ:Phút — Ngày/Tháng/Năm (VD: 08:45 — 15/11/2026)
+function formatUpdateTime(isoStr) {
+  if (!isoStr) return null;
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return null;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${hh}:${mi} — ${dd}/${mm}/${yyyy}`;
+}
+
 function getTodayStr() {
   const now = new Date();
   const yyyy = now.getFullYear();
@@ -82,6 +118,7 @@ export default function App() {
 
   const [filterTrainer, setFilterTrainer] = useState('ALL');
   const [searchClient, setSearchClient] = useState('');
+  const [sortClientMode, setSortClientMode] = useState('DEFAULT'); // DEFAULT | RECENT
   const [editingClient, setEditingClient] = useState(null);
 
   const [startDate, setStartDate] = useState(weekRange.start);
@@ -224,11 +261,25 @@ export default function App() {
     });
   };
 
+  // Lưu mốc thời gian khi sửa từ Lịch Ngày có tích chọn cập nhật Lịch Tuần
+  const stampClientWeeklyUpdate = async (clientId) => {
+    if (!clientId) return;
+    const target = clients.find(c => c._id === clientId);
+    if (!target) return;
+    const { cleanNote } = parseClientNoteAndTime(target.packageNote, target.updatedAt);
+    await axios.put(`${API_URL}/clients/${clientId}`, {
+      packageNote: attachUpdateTimestamp(cleanNote)
+    });
+  };
+
   const handleSaveReschedule = async (e) => {
     e.preventDefault();
     const res = await axios.put(`${API_URL}/daily-session/${editingSession._id}/reschedule`, editForm);
     setSessions(sessions.map(s => (s._id === editingSession._id ? res.data : s)));
-    if (editForm.updateScope === 'WEEKLY') fetchInitData();
+    if (editForm.updateScope === 'WEEKLY') {
+      await stampClientWeeklyUpdate(editingSession.clientId);
+      await fetchInitData();
+    }
     setEditingSession(null);
   };
 
@@ -290,7 +341,10 @@ export default function App() {
       ...addForm
     });
     setSessions([...sessions, res.data]);
-    if (addForm.saveToWeekly) fetchInitData();
+    if (addForm.saveToWeekly && addForm.clientId) {
+      await stampClientWeeklyUpdate(addForm.clientId);
+      await fetchInitData();
+    }
     setShowAddModal(false);
   };
 
@@ -305,7 +359,11 @@ export default function App() {
   };
 
   const handleSaveClientWeekly = async () => {
-    const res = await axios.put(`${API_URL}/clients/${editingClient._id}`, editingClient);
+    const payload = {
+      ...editingClient,
+      packageNote: attachUpdateTimestamp(editingClient.packageNote)
+    };
+    const res = await axios.put(`${API_URL}/clients/${editingClient._id}`, payload);
     setClients(clients.map(c => (c._id === editingClient._id ? res.data : c)));
     setEditingClient(null);
   };
@@ -322,6 +380,19 @@ export default function App() {
   const totalCancelledShifts = sessions.filter(
     s => s.status === 'CANCELLED' && s.clientName !== 'OFF'
   ).length;
+
+  // Lọc và sắp xếp danh sách khách hàng ở Tab 2
+  const displayedClients = clients
+    .filter(c => filterTrainer === 'ALL' || (c.primaryTrainerId?._id || c.primaryTrainerId) === filterTrainer)
+    .filter(c => c.name.toLowerCase().includes(searchClient.toLowerCase()))
+    .sort((a, b) => {
+      if (sortClientMode !== 'RECENT') return 0;
+      const timeA = parseClientNoteAndTime(a.packageNote, a.updatedAt).updatedAt;
+      const timeB = parseClientNoteAndTime(b.packageNote, b.updatedAt).updatedAt;
+      const msA = timeA ? new Date(timeA).getTime() : 0;
+      const msB = timeB ? new Date(timeB).getTime() : 0;
+      return msB - msA;
+    });
 
   return (
     <div className="app-shell">
@@ -536,6 +607,17 @@ export default function App() {
           background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;
           padding: 4px 9px; border-radius: 6px; font-size: 12px;
           font-weight: 700; white-space: nowrap;
+        }
+        .ModifiedTimeBox {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 5px 10px; border-radius: 7px; font-size: 11.5px;
+          font-weight: 600; white-space: nowrap;
+        }
+        .ModifiedTimeBox.edited {
+          background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d;
+        }
+        .ModifiedTimeBox.unchanged {
+          background: #f8fafc; border: 1px dashed #e2e8f0; color: #94a3b8;
         }
 
         @media (max-width: 768px) {
@@ -935,6 +1017,15 @@ export default function App() {
                 ))}
               </select>
 
+              <select
+                value={sortClientMode}
+                onChange={e => setSortClientMode(e.target.value)}
+                style={styles.input}
+              >
+                <option value="DEFAULT">📑 Sắp xếp: Mặc định</option>
+                <option value="RECENT">🕒 Sắp xếp: Mới chỉnh sửa gần nhất</option>
+              </select>
+
               <input
                 type="text"
                 placeholder="🔍 Tìm tên khách hàng..."
@@ -961,10 +1052,14 @@ export default function App() {
           </div>
 
           <div className="ClientCardsGrid">
-            {clients
-              .filter(c => filterTrainer === 'ALL' || (c.primaryTrainerId?._id || c.primaryTrainerId) === filterTrainer)
-              .filter(c => c.name.toLowerCase().includes(searchClient.toLowerCase()))
-              .map(client => (
+            {displayedClients.map(client => {
+              const { cleanNote, updatedAt } = parseClientNoteAndTime(
+                client.packageNote,
+                client.updatedAt
+              );
+              const formattedTime = formatUpdateTime(updatedAt);
+
+              return (
                 <div key={client._id} className="ClientItemCard">
                   <div className="ClientCardTop">
                     <div>
@@ -997,7 +1092,7 @@ export default function App() {
                       ))}
                   </div>
 
-                  {client.packageNote && (
+                  {cleanNote && (
                     <div
                       style={{
                         background: '#fffbeb',
@@ -1009,15 +1104,29 @@ export default function App() {
                         fontWeight: 600
                       }}
                     >
-                      📌 {client.packageNote}
+                      📌 {cleanNote}
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto' }}>
+                  {/* Dòng hiển thị thời gian chỉnh sửa lịch tuần */}
+                  <div
+                    className={`ModifiedTimeBox ${formattedTime ? 'edited' : 'unchanged'}`}
+                    style={{ marginTop: 'auto' }}
+                  >
+                    <span>
+                      {formattedTime
+                        ? `🕒 Đã sửa: ${formattedTime}`
+                        : '🕒 Chưa có lịch sử chỉnh sửa'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button
                       onClick={() =>
                         setEditingClient({
                           ...client,
+                          packageNote: cleanNote,
+                          lastModifiedDisplay: formattedTime,
                           primaryTrainerId: client.primaryTrainerId?._id || client.primaryTrainerId
                         })
                       }
@@ -1028,7 +1137,8 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-              ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -1267,9 +1377,26 @@ export default function App() {
       {editingClient && (
         <div style={styles.modalBackdrop}>
           <div style={{ ...styles.modalCard, width: '500px' }}>
-            <h3 style={styles.modalTitle}>
+            <h3 style={{ ...styles.modalTitle, marginBottom: '6px' }}>
               {editingClient._id ? `Lịch Tuần: ${editingClient.name}` : 'Thêm Khách Hàng Mới'}
             </h3>
+
+            {editingClient.lastModifiedDisplay && (
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: '#15803d',
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  marginBottom: '12px',
+                  fontWeight: 600
+                }}
+              >
+                🕒 Lần chỉnh sửa gần nhất: {editingClient.lastModifiedDisplay}
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <label style={styles.fieldGroup}>
@@ -1411,7 +1538,11 @@ export default function App() {
                   if (editingClient._id) {
                     await handleSaveClientWeekly();
                   } else {
-                    const res = await axios.post(`${API_URL}/clients`, editingClient);
+                    const payload = {
+                      ...editingClient,
+                      packageNote: attachUpdateTimestamp(editingClient.packageNote)
+                    };
+                    const res = await axios.post(`${API_URL}/clients`, payload);
                     setClients([...clients, res.data]);
                     setEditingClient(null);
                   }
