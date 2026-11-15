@@ -59,6 +59,27 @@ function getTodayStr() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// Lấy tháng hiện tại định dạng YYYY-MM (VD: 2026-11)
+function getCurrentYearMonth() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  return `${yyyy}-${mm}`;
+}
+
+// Tính ngày đầu tháng và cuối tháng từ chuỗi YYYY-MM (VD: 2026-11 -> 2026-11-01 đến 2026-11-30)
+function getMonthRange(yearMonthStr) {
+  const [y, m] = yearMonthStr.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  const mm = String(m).padStart(2, '0');
+  const ddLast = String(lastDay).padStart(2, '0');
+  return {
+    start: `${y}-${mm}-01`,
+    end: `${y}-${mm}-${ddLast}`,
+    label: `Tháng ${mm}/${y}`
+  };
+}
+
 function getCurrentWeekRange() {
   const now = new Date();
   const day = now.getDay();
@@ -121,6 +142,7 @@ export default function App() {
   const [sortClientMode, setSortClientMode] = useState('DEFAULT'); // DEFAULT | RECENT
   const [editingClient, setEditingClient] = useState(null);
 
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);
   const [startDate, setStartDate] = useState(weekRange.start);
   const [endDate, setEndDate] = useState(weekRange.end);
   const [weeklySummary, setWeeklySummary] = useState([]);
@@ -223,7 +245,7 @@ export default function App() {
   const exportWeeklyToExcel = () => {
     const aoa = [
       [`GYM DINHLE - TỔNG HỢP CA PT (${startDate} đến ${endDate})`],
-      ['Huấn Luyện Viên (PT)', 'Chi Tiết Các Ngày Đã Chốt', 'Tổng Số Ca Tuần']
+      ['Huấn Luyện Viên (PT)', 'Chi Tiết Các Ngày Đã Chốt', 'Tổng Số Ca']
     ];
 
     trainers.forEach(trainer => {
@@ -239,7 +261,7 @@ export default function App() {
     ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Tong_Hop_Tuan');
+    XLSX.utils.book_append_sheet(wb, ws, 'Tong_Hop');
     XLSX.writeFile(wb, `GymDinhLe_Tong_Hop_Ca_${startDate}_den_${endDate}.xlsx`);
   };
 
@@ -368,11 +390,44 @@ export default function App() {
     setEditingClient(null);
   };
 
-  const loadWeeklySummary = async () => {
+  const loadWeeklySummary = async (customStart = startDate, customEnd = endDate) => {
     const res = await axios.get(`${API_URL}/weekly-summary`, {
-      params: { startDate, endDate }
+      params: { startDate: customStart, endDate: customEnd }
     });
     setWeeklySummary(res.data);
+  };
+
+  // Chọn nhanh cả tháng (VD: Tháng 11/2026 -> 2026-11-01 đến 2026-11-30)
+  const handleSelectFullMonth = (ymStr) => {
+    setSelectedMonth(ymStr);
+    const { start, end } = getMonthRange(ymStr);
+    setStartDate(start);
+    setEndDate(end);
+    loadWeeklySummary(start, end);
+  };
+
+  // Xóa toàn bộ dữ liệu chốt ca của tháng đang chọn (VD: Tháng 11/2026)
+  const handleDeleteMonthSessions = async () => {
+    const { start, end, label } = getMonthRange(selectedMonth);
+    const confirmMsg =
+      `BẠN CÓ CHẮC CHẮN MUỐN XÓA DỮ LIỆU CHỐT CA CỦA ${label.toUpperCase()}?\n\n` +
+      `• Khoảng thời gian xóa: Từ ${start} đến ${end}\n` +
+      `• Danh sách 48 khách hàng và Lịch Tuần cố định vẫn được GIỮ NGUYÊN 100%.\n` +
+      `• Hãy chắc chắn bạn đã bấm "Xuất Excel" để lưu báo cáo tháng trước khi xóa!`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await axios.post(`${API_URL}/daily-schedule/clear-range`, {
+        startDate: start,
+        endDate: end
+      });
+      alert(`✅ Đã xóa thành công ${res.data.deletedCount} ca tập của ${label} để giải phóng bộ nhớ!`);
+      loadWeeklySummary(start, end);
+      loadDailySchedule(selectedDate);
+    } catch (err) {
+      alert('Lỗi khi xóa dữ liệu tháng: ' + (err.response?.data?.error || err.message));
+    }
   };
 
   const isDayLocked = sessions.some(s => s.isLocked);
@@ -393,6 +448,8 @@ export default function App() {
       const msB = timeB ? new Date(timeB).getTime() : 0;
       return msB - msA;
     });
+
+  const currentMonthInfo = getMonthRange(selectedMonth);
 
   return (
     <div className="app-shell">
@@ -469,6 +526,7 @@ export default function App() {
         .BtnGreen { background: #16a34a; color: #fff; }
         .BtnOrange { background: #ea580c; color: #fff; }
         .BtnDark { background: #1e293b; color: #fff; }
+        .BtnRed { background: #e11d48; color: #fff; }
 
         /* KHUNG BẢNG LỊCH NGÀY FULL MÀN HÌNH & KHÔNG RỚT CHỮ */
         .MainArea { flex: 1; width: 100%; padding: 10px 12px 20px; }
@@ -669,7 +727,7 @@ export default function App() {
               }}
               className={`NavBtn ${activeTab === 'SUMMARY' ? 'active' : ''}`}
             >
-              📊 Tổng Hợp Tuần
+              📊 Tổng Hợp & Dọn Tháng
             </button>
           </div>
         </header>
@@ -1143,23 +1201,58 @@ export default function App() {
         </div>
       )}
 
-      {/* ==================== TAB 3: TỔNG HỢP CUỐI TUẦN ==================== */}
+      {/* ==================== TAB 3: TỔNG HỢP & DỌN DẸP THEO THÁNG ==================== */}
       {activeTab === 'SUMMARY' && (
         <div className="MainArea">
-          <div className="ToolbarCard" style={{ margin: '0 0 12px 0' }}>
+          {/* Thanh chọn theo Tháng (VD: Tháng 11/2026) để Xuất Excel hoặc Xóa Sạch Cuối Tháng */}
+          <div
+            className="ToolbarCard"
+            style={{
+              margin: '0 0 12px 0',
+              background: '#f8fafc',
+              border: '1px solid #cbd5e1'
+            }}
+          >
             <div className="ToolSection">
-              <span style={{ fontSize: '13px', fontWeight: 700 }}>Từ:</span>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={styles.input} />
-              <span style={{ fontSize: '13px', fontWeight: 700 }}>Đến:</span>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={styles.input} />
-              <button onClick={loadWeeklySummary} className="Btn BtnBlue">
-                🔍 Lọc Dữ Liệu
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>
+                🗓 Quản lý theo Tháng:
+              </span>
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={e => handleSelectFullMonth(e.target.value)}
+                style={{ ...styles.input, fontWeight: 700 }}
+              />
+              <button
+                onClick={() => handleSelectFullMonth(selectedMonth)}
+                className="Btn BtnDark"
+              >
+                📅 Xem Cả {currentMonthInfo.label}
               </button>
             </div>
 
-            <button onClick={exportWeeklyToExcel} className="Btn BtnEmerald">
-              📥 Xuất Excel Tuần
-            </button>
+            <div className="ToolSection">
+              <button onClick={exportWeeklyToExcel} className="Btn BtnEmerald">
+                📥 Xuất Excel ({startDate.slice(5)} → {endDate.slice(5)})
+              </button>
+
+              <button onClick={handleDeleteMonthSessions} className="Btn BtnRed">
+                🗑 Xóa Chốt Ca {currentMonthInfo.label}
+              </button>
+            </div>
+          </div>
+
+          {/* Thanh lọc tùy chỉnh từ ngày đến ngày */}
+          <div className="ToolbarCard" style={{ margin: '0 0 12px 0' }}>
+            <div className="ToolSection">
+              <span style={{ fontSize: '13px', fontWeight: 700 }}>Từ ngày:</span>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={styles.input} />
+              <span style={{ fontSize: '13px', fontWeight: 700 }}>Đến ngày:</span>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={styles.input} />
+              <button onClick={() => loadWeeklySummary(startDate, endDate)} className="Btn BtnBlue">
+                🔍 Lọc Theo Ngày
+              </button>
+            </div>
           </div>
 
           <div className="ClientCardsGrid">
