@@ -35,6 +35,15 @@ function formatSessionNameWithDouble(cleanName = '', isDouble = false) {
   return isDouble ? `${pure} ${DOUBLE_MARKER}` : pure;
 }
 
+// Tách danh sách tên khách trong ca đôi (ngăn cách bởi dấu +) để xếp dòng gọn đẹp
+function splitDoubleClientNames(rawName = '') {
+  const clean = getCleanSessionName(rawName);
+  if (clean.includes('+')) {
+    return clean.split('+').map(part => part.trim()).filter(Boolean);
+  }
+  return [clean];
+}
+
 // Tách nội dung ghi chú gốc và mốc thời gian chỉnh sửa lịch tuần
 function parseClientNoteAndTime(rawNote = '', fallbackUpdatedAt = null) {
   if (!rawNote) {
@@ -633,7 +642,7 @@ export default function App() {
         .BtnDark { background: #1e293b; color: #fff; }
         .BtnRed { background: #e11d48; color: #fff; }
 
-        /* KHUNG BẢNG LỊCH NGÀY FULL MÀN HÌNH & KHÔNG RỚT CHỮ */
+        /* KHUNG BẢNG LỊCH NGÀY FULL MÀN HÌNH & CỘT PT CHIA ĐỀU 100% */
         .MainArea { flex: 1; width: 100%; padding: 10px 12px 20px; }
         .BoardCard {
           background: #fff; border-radius: 14px; border: 1px solid #cbd5e1;
@@ -652,31 +661,39 @@ export default function App() {
           border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap;
         }
 
-        /* BẢNG MA TRẬN CUỘN MƯỢT VỚI CỘT 'CA' CỐ ĐỊNH */
+        /* BẢNG MA TRẬN: KHÓA CỐ ĐỊNH ĐỘ RỘNG CÁC CỘT PT BẰNG NHAU (table-layout: fixed) */
         .TableScrollBox {
           width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
         }
         .MatrixTable {
-          width: 100%; border-collapse: separate; border-spacing: 0;
-          min-width: 980px;
+          width: 100%;
+          min-width: 1120px;
+          table-layout: fixed; /* Giúp cả 8 cột PT luôn rộng bằng nhau, không bị giãn lệch */
+          border-collapse: separate;
+          border-spacing: 0;
         }
         .MatrixTable th, .MatrixTable td {
-          border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;
-          padding: 6px 8px; vertical-align: middle;
+          border-right: 1px solid #e2e8f0;
+          border-bottom: 1px solid #e2e8f0;
+          padding: 6px 6px;
+          vertical-align: middle;
         }
         .StickyCol {
           position: sticky; left: 0; z-index: 10;
-          width: 52px; min-width: 52px; max-width: 52px;
+          width: 46px; min-width: 46px; max-width: 46px;
           text-align: center; font-weight: 800; font-size: 12.5px;
           background: #f8fafc; border-right: 2px solid #cbd5e1 !important;
           white-space: nowrap;
         }
         .ThTrainer {
-          background: #fef9c3; min-width: 138px; text-align: center; padding: 8px 6px !important;
+          background: #fef9c3;
+          text-align: center;
+          padding: 8px 6px !important;
         }
         .TrainerName {
           font-size: 13.5px; font-weight: 800; color: #0f172a;
-          white-space: nowrap; margin-bottom: 5px;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          margin-bottom: 5px;
         }
         .TrainerActionRow { display: flex; justify-content: center; gap: 5px; }
         .MiniTagBtn {
@@ -684,19 +701,25 @@ export default function App() {
           font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap;
         }
 
-        /* THẺ KHÁCH TRONG Ô */
+        /* THẺ CA TẬP GỌN ĐẸP, CÂN ĐỐI TRONG KHUNG CỘT */
         .SessionCard {
-          display: flex; align-items: center; justify-content: space-between;
+          display: flex; flex-direction: column; justify-content: center;
           background: #eff6ff; border: 1px solid #bfdbfe;
           border-left: 3.5px solid #2563eb;
-          border-radius: 8px; padding: 5px 8px; gap: 6px;
+          border-radius: 8px; padding: 6px 7px; gap: 4px;
           cursor: pointer; transition: 0.12s;
+          width: 100%; overflow: hidden;
         }
         .SessionCard.double-shift {
-          background: #f5f3ff; border-color: #ddd6fe;
+          background: linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%);
+          border: 1px solid #c4b5fd;
           border-left: 4px solid #7c3aed;
+          padding: 6px 7px;
         }
-        .SessionCard:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(37,99,235,0.12); }
+        .SessionCard:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 3px 8px rgba(37, 99, 235, 0.14);
+        }
         .SessionCard.cancelled {
           background: #f8fafc; border-color: #cbd5e1; border-left-color: #94a3b8; opacity: 0.68;
         }
@@ -704,52 +727,84 @@ export default function App() {
           background: #ecfdf5; border-color: #a7f3d0; border-left-color: #10b981;
         }
         .SessionCard.off {
-          background: #fef3c7; border: 1px dashed #f59e0b; justify-content: center; padding: 6px;
+          background: #fef3c7; border: 1px dashed #f59e0b; align-items: center; padding: 6px;
         }
-        .SessionInfo {
+
+        /* Ca đơn: Tên bên trái, Giờ + X bên phải */
+        .SingleRowLayout {
           display: flex; align-items: center; justify-content: space-between;
-          gap: 6px; flex: 1; min-width: 0;
+          gap: 5px; width: 100%;
         }
+        /* Ca đôi: Hàng trên chứa Badge Ca đôi + Giờ + X, hàng dưới xếp dọc tên 2 khách */
+        .DoubleTopBar {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 4px; width: 100%;
+          border-bottom: 1px dashed rgba(124, 58, 237, 0.22);
+          padding-bottom: 4px;
+        }
+        .DoubleRightControls {
+          display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+        }
+        .DoubleNamesStack {
+          display: flex; flex-direction: column; gap: 2px; width: 100%; padding-top: 1px;
+        }
+        .DoublePersonLine {
+          font-size: 12px; font-weight: 700; color: #2e1065;
+          line-height: 1.25; text-align: left;
+          display: flex; align-items: flex-start; gap: 4px;
+          word-break: keep-all; overflow-wrap: break-word;
+        }
+        .PersonDot {
+          color: #7c3aed; font-weight: 900; font-size: 11px; line-height: 1.25; flex-shrink: 0;
+        }
+
         .ClientTitle {
-          font-size: 13px; font-weight: 700; color: #1e293b;
+          font-size: 12.5px; font-weight: 700; color: #1e293b;
           word-break: keep-all; overflow-wrap: break-word; line-height: 1.25;
-          text-align: left;
+          text-align: left; flex: 1; min-width: 0;
         }
         .DoubleBadge {
-          display: inline-block; background: #7c3aed; color: #fff;
-          font-size: 10px; font-weight: 800; padding: 1px 5px;
-          border-radius: 4px; margin-right: 4px; white-space: nowrap;
-          vertical-align: middle;
+          display: inline-flex; align-items: center; gap: 3px;
+          background: #7c3aed; color: #fff;
+          font-size: 10px; font-weight: 800; padding: 2px 6px;
+          border-radius: 5px; white-space: nowrap; flex-shrink: 0;
         }
         .TimePill {
           background: #fff; color: #1d4ed8; border: 1px solid #bfdbfe;
-          font-size: 11.5px; font-weight: 800; padding: 2px 6px;
-          border-radius: 6px; white-space: nowrap; flex-shrink: 0;
+          font-size: 11px; font-weight: 800; padding: 1.5px 5px;
+          border-radius: 5px; white-space: nowrap; flex-shrink: 0;
+        }
+        .SessionCard.double-shift .TimePill {
+          color: #6d28d9; border-color: #c4b5fd;
         }
         .CancelBtn {
-          border: none; background: rgba(148, 163, 184, 0.15); color: #64748b;
-          width: 20px; height: 20px; border-radius: 5px;
+          border: none; background: rgba(148, 163, 184, 0.18); color: #64748b;
+          width: 19px; height: 19px; border-radius: 5px;
           display: flex; align-items: center; justify-content: center;
-          font-size: 11px; cursor: pointer; flex-shrink: 0;
+          font-size: 10.5px; cursor: pointer; flex-shrink: 0; padding: 0;
         }
         .CancelBtn:hover { background: #fee2e2; color: #e11d48; }
 
-        /* DÒNG CHỐT CA CUỐI BẢNG */
+        /* DÒNG CHỐT CA CUỐI BẢNG GỌN GÀNG, ĐỒNG ĐỀU */
         .FooterRow td {
           background: #0f172a !important; color: #fff !important;
-          padding: 10px 6px !important; text-align: center; font-weight: 800;
+          padding: 9px 4px !important; text-align: center; font-weight: 800;
           vertical-align: middle;
+        }
+        .FooterCellWrap {
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          gap: 4px; min-height: 28px;
         }
         .FooterCountBadge {
           display: inline-block; background: #22c55e; color: #fff;
-          font-size: 14px; font-weight: 800; padding: 3px 14px;
+          font-size: 13.5px; font-weight: 800; padding: 2px 13px;
           border-radius: 20px; white-space: nowrap;
         }
         .FooterDoubleNote {
-          margin-top: 5px; font-size: 11px; font-weight: 700;
-          color: #fde047; background: rgba(254, 240, 138, 0.16);
-          border: 1px solid rgba(253, 224, 71, 0.4);
-          padding: 2px 7px; border-radius: 6px; display: inline-block;
+          font-size: 10.5px; font-weight: 700;
+          color: #fde047; background: rgba(254, 240, 138, 0.14);
+          border: 1px solid rgba(253, 224, 71, 0.35);
+          padding: 1.5px 6px; border-radius: 5px; display: inline-block;
           white-space: nowrap;
         }
 
@@ -953,7 +1008,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* CHẾ ĐỘ 1: BẢNG MA TRẬN CHUẨN */}
+              {/* CHẾ ĐỘ 1: BẢNG MA TRẬN CHUẨN CỘT ĐỀU NHAU */}
               {dailyLayout === 'BOARD' ? (
                 <div className="TableScrollBox">
                   <table className="MatrixTable">
@@ -966,7 +1021,7 @@ export default function App() {
                           );
                           return (
                             <th key={trainer._id} className="ThTrainer">
-                              <div className="TrainerName">{trainer.name}</div>
+                              <div className="TrainerName" title={trainer.name}>{trainer.name}</div>
                               <div className="TrainerActionRow">
                                 <button
                                   onClick={() => openQuickAddForTrainer(trainer._id)}
@@ -1008,6 +1063,7 @@ export default function App() {
                             const isCancelled = cellSession?.status === 'CANCELLED' && !isOffMarker;
                             const isCompleted = cellSession?.status === 'COMPLETED';
                             const isDouble = cellSession && isDoubleSession(cellSession);
+                            const nameParts = cellSession ? splitDoubleClientNames(cellSession.clientName) : [];
 
                             return (
                               <td
@@ -1030,35 +1086,66 @@ export default function App() {
                                       <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#b45309', whiteSpace: 'nowrap' }}>
                                         NGHỈ PHÉP (OFF)
                                       </span>
-                                    ) : (
+                                    ) : isDouble ? (
+                                      /* THIẾT KẾ GỌN ĐẸP CHO CA ĐÔI: KHÔNG BỊ KÉO DÀI NGANG */
                                       <>
-                                        <div className="SessionInfo">
-                                          <span
-                                            className="ClientTitle"
-                                            style={{
-                                              textDecoration: isCancelled ? 'line-through' : 'none'
-                                            }}
-                                          >
-                                            {isDouble && (
-                                              <span className="DoubleBadge">👥 Ca đôi</span>
+                                        <div className="DoubleTopBar">
+                                          <span className="DoubleBadge">👥 Ca đôi</span>
+                                          <div className="DoubleRightControls">
+                                            <span className="TimePill">{cellSession.time || 'h'}</span>
+                                            {!cellSession.isLocked && (
+                                              <button
+                                                onClick={e => handleQuickToggleCancel(cellSession, e)}
+                                                className="CancelBtn"
+                                                title={isCancelled ? 'Khôi phục' : 'Gạch hủy ca'}
+                                              >
+                                                {isCancelled ? '↺' : '✕'}
+                                              </button>
                                             )}
-                                            {getCleanSessionName(cellSession.clientName)}
-                                          </span>
+                                          </div>
+                                        </div>
+
+                                        <div
+                                          className="DoubleNamesStack"
+                                          style={{
+                                            textDecoration: isCancelled ? 'line-through' : 'none'
+                                          }}
+                                        >
+                                          {nameParts.map((person, pIdx) => (
+                                            <div key={pIdx} className="DoublePersonLine">
+                                              <span className="PersonDot">•</span>
+                                              <span>{person}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </>
+                                    ) : (
+                                      /* THIẾT KẾ CA ĐƠN GỌN GÀNG */
+                                      <div className="SingleRowLayout">
+                                        <span
+                                          className="ClientTitle"
+                                          style={{
+                                            textDecoration: isCancelled ? 'line-through' : 'none'
+                                          }}
+                                        >
+                                          {getCleanSessionName(cellSession.clientName)}
+                                        </span>
+
+                                        <div className="DoubleRightControls">
                                           <span className="TimePill">
                                             {cellSession.time || 'h'}
                                           </span>
+                                          {!cellSession.isLocked && (
+                                            <button
+                                              onClick={e => handleQuickToggleCancel(cellSession, e)}
+                                              className="CancelBtn"
+                                              title={isCancelled ? 'Khôi phục' : 'Gạch hủy ca'}
+                                            >
+                                              {isCancelled ? '↺' : '✕'}
+                                            </button>
+                                          )}
                                         </div>
-
-                                        {!cellSession.isLocked && (
-                                          <button
-                                            onClick={e => handleQuickToggleCancel(cellSession, e)}
-                                            className="CancelBtn"
-                                            title={isCancelled ? 'Khôi phục' : 'Gạch hủy ca'}
-                                          >
-                                            {isCancelled ? '↺' : '✕'}
-                                          </button>
-                                        )}
-                                      </>
+                                      </div>
                                     )}
                                   </div>
                                 )}
@@ -1068,7 +1155,7 @@ export default function App() {
                         </tr>
                       ))}
 
-                      {/* DÒNG CHỐT CA CUỐI BẢNG: HIỂN THỊ TỔNG CA (CA ĐÔI TÍNH LÀ 1) + NOTE SỐ CA ĐÔI */}
+                      {/* DÒNG CHỐT CA CUỐI BẢNG */}
                       <tr className="FooterRow">
                         <td className="StickyCol" style={{ background: '#0f172a', color: '#fff' }}>
                           Chốt
@@ -1082,14 +1169,14 @@ export default function App() {
 
                           return (
                             <td key={trainer._id}>
-                              <div>
+                              <div className="FooterCellWrap">
                                 <span className="FooterCountBadge">{validCount}</span>
+                                {doubleCount > 0 && (
+                                  <span className="FooterDoubleNote">
+                                    📝 Có {doubleCount} ca đôi
+                                  </span>
+                                )}
                               </div>
-                              {doubleCount > 0 && (
-                                <div className="FooterDoubleNote">
-                                  📝 Có {doubleCount} ca đôi
-                                </div>
-                              )}
                             </td>
                           );
                         })}
@@ -1184,32 +1271,34 @@ export default function App() {
                                       NGHỈ PHÉP (OFF)
                                     </span>
                                   ) : (
-                                    <>
-                                      <div className="SessionInfo">
-                                        <span
-                                          className="ClientTitle"
-                                          style={{
-                                            textDecoration: isCancelled ? 'line-through' : 'none'
-                                          }}
-                                        >
-                                          #{idx + 1}.{' '}
-                                          {isDouble && (
-                                            <span className="DoubleBadge">👥 Ca đôi</span>
-                                          )}
-                                          {getCleanSessionName(cellSession.clientName)}
-                                        </span>
-                                        <span className="TimePill">{cellSession.time || 'h'}</span>
-                                      </div>
+                                    <div className="SingleRowLayout">
+                                      <span
+                                        className="ClientTitle"
+                                        style={{
+                                          textDecoration: isCancelled ? 'line-through' : 'none'
+                                        }}
+                                      >
+                                        #{idx + 1}.{' '}
+                                        {isDouble && (
+                                          <span className="DoubleBadge" style={{ marginRight: '5px' }}>
+                                            👥 Ca đôi
+                                          </span>
+                                        )}
+                                        {getCleanSessionName(cellSession.clientName)}
+                                      </span>
 
-                                      {!cellSession.isLocked && (
-                                        <button
-                                          onClick={e => handleQuickToggleCancel(cellSession, e)}
-                                          className="CancelBtn"
-                                        >
-                                          {isCancelled ? '↺' : '✕'}
-                                        </button>
-                                      )}
-                                    </>
+                                      <div className="DoubleRightControls">
+                                        <span className="TimePill">{cellSession.time || 'h'}</span>
+                                        {!cellSession.isLocked && (
+                                          <button
+                                            onClick={e => handleQuickToggleCancel(cellSession, e)}
+                                            className="CancelBtn"
+                                          >
+                                            {isCancelled ? '↺' : '✕'}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
                               );
