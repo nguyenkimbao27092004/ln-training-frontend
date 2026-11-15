@@ -559,8 +559,6 @@ export default function App() {
           </form>
 
           <div className="AuthHint">
-            🔒 <strong>Tài khoản Admin:</strong> <code>dinhle</code> / <code>dinhle123</code>
-            <br />
             👥 <strong>Tài khoản PT:</strong> Có thể bấm qua mục <em>"Đăng Ký PT"</em> để tạo tài khoản xem lịch.
           </div>
         </div>
