@@ -26,6 +26,22 @@ import Modals from './Modals';
 export default function App() {
   const weekRange = getCurrentWeekRange();
 
+  // Lưu nhớ trạng thái đăng nhập trong localStorage
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gym_dinhle_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // State Form Đăng nhập & Đăng ký
+  const [authMode, setAuthMode] = useState('LOGIN'); // LOGIN | REGISTER
+  const [authForm, setAuthForm] = useState({ username: '', password: '', name: '', trainerId: '' });
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
   const [activeTab, setActiveTab] = useState('DAILY');
   const [dailyLayout, setDailyLayout] = useState('BOARD');
   const [isFullscreenBoard, setIsFullscreenBoard] = useState(false);
@@ -34,7 +50,7 @@ export default function App() {
   const [clients, setClients] = useState([]);
   const [selectedDate, setSelectedDate] = useState(getTodayStr);
   const [sessions, setSessions] = useState([]);
-  const [autoSortTime] = useState(true);
+  const [autoSortTime, setAutoSortTime] = useState(true);
 
   const [editingSession, setEditingSession] = useState(null);
   const [editForm, setEditForm] = useState({
@@ -61,14 +77,18 @@ export default function App() {
   });
 
   const [filterTrainer, setFilterTrainer] = useState('ALL');
+  const [filterStatus, setFilterStatus] = useState('ALL'); // ALL | ACTIVE | PAUSED
   const [searchClient, setSearchClient] = useState('');
   const [sortClientMode, setSortClientMode] = useState('DEFAULT');
   const [editingClient, setEditingClient] = useState(null);
+  const [showPausedModal, setShowPausedModal] = useState(false);
 
   const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);
   const [startDate, setStartDate] = useState(weekRange.start);
   const [endDate, setEndDate] = useState(weekRange.end);
   const [weeklySummary, setWeeklySummary] = useState([]);
+
+  const isAdmin = currentUser?.role === 'ADMIN';
 
   useEffect(() => {
     document.title = 'Gym DinhLe';
@@ -79,24 +99,81 @@ export default function App() {
       document.head.appendChild(link);
     }
     link.href = '/logo.png';
-    fetchInitData();
-  }, []);
+
+    if (currentUser) {
+      fetchInitData();
+    }
+  }, [currentUser]);
 
   useEffect(() => {
-    loadDailySchedule(selectedDate);
-  }, [selectedDate]);
+    if (currentUser) {
+      loadDailySchedule(selectedDate);
+    }
+  }, [selectedDate, currentUser]);
 
   const fetchInitData = async () => {
-    const res = await axios.get(`${API_URL}/init`);
-    setTrainers(res.data.trainers);
-    setClients(res.data.clients);
+    try {
+      const res = await axios.get(`${API_URL}/init`);
+      setTrainers(res.data.trainers);
+      setClients(res.data.clients);
+    } catch (err) {
+      console.error('Lỗi nạp dữ liệu:', err);
+    }
   };
 
   const loadDailySchedule = async (date) => {
-    const res = await axios.post(`${API_URL}/daily-schedule`, { date });
-    setSessions(res.data);
+    try {
+      const res = await axios.post(`${API_URL}/daily-schedule`, { date });
+      setSessions(res.data);
+    } catch (err) {
+      console.error('Lỗi tải lịch ngày:', err);
+    }
   };
 
+  // ==================== XỬ LÝ ĐĂNG NHẬP / ĐĂNG KÝ / ĐĂNG XUẤT ====================
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthLoading(true);
+
+    try {
+      if (authMode === 'LOGIN') {
+        const res = await axios.post(`${API_URL}/auth/login`, {
+          username: authForm.username,
+          password: authForm.password
+        });
+        const user = res.data.user;
+        setCurrentUser(user);
+        localStorage.setItem('gym_dinhle_user', JSON.stringify(user));
+      } else {
+        const res = await axios.post(`${API_URL}/auth/register`, {
+          username: authForm.username,
+          password: authForm.password,
+          name: authForm.name,
+          trainerId: authForm.trainerId || null
+        });
+        const user = res.data.user;
+        alert('Đăng ký tài khoản PT thành công! Bạn có thể xem lịch ngay.');
+        setCurrentUser(user);
+        localStorage.setItem('gym_dinhle_user', JSON.stringify(user));
+      }
+    } catch (err) {
+      setAuthError(err.response?.data?.error || 'Đã có lỗi xảy ra, vui lòng thử lại');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
+      setCurrentUser(null);
+      localStorage.removeItem('gym_dinhle_user');
+      setAuthForm({ username: '', password: '', name: '', trainerId: '' });
+      setAuthError('');
+    }
+  };
+
+  // ==================== CÁC HÀM XỬ LÝ LỊCH & KHÁCH HÀNG ====================
   const changeDayBy = (delta) => {
     const [y, m, d] = selectedDate.split('-').map(Number);
     const dt = new Date(y, m - 1, d + delta);
@@ -134,12 +211,14 @@ export default function App() {
     });
 
   const handleResyncFromWeekly = async () => {
+    if (!isAdmin) return alert('Chỉ có tài khoản Admin mới có quyền đồng bộ lại lịch tuần!');
     if (!window.confirm('Đồng bộ lại lịch ngày này theo Lịch Cố Định Tuần?')) return;
     const res = await axios.post(`${API_URL}/daily-schedule/resync`, { date: selectedDate });
     setSessions(res.data);
   };
 
   const openEditModal = (session) => {
+    if (!isAdmin) return alert('Tài khoản Huấn Luyện Viên (PT) chỉ có quyền xem lịch, không được sửa ca!');
     if (session.clientName === 'OFF') return;
     setEditingSession(session);
     setEditForm({
@@ -166,6 +245,7 @@ export default function App() {
 
   const handleSaveReschedule = async (e) => {
     e.preventDefault();
+    if (!isAdmin) return alert('Chỉ Admin mới có quyền xếp lại ca!');
     let baseName = editForm.clientName.trim();
 
     if (editForm.isDouble) {
@@ -215,6 +295,7 @@ export default function App() {
 
   const handleQuickToggleCancel = async (session, e) => {
     e.stopPropagation();
+    if (!isAdmin) return alert('Chỉ Admin mới có quyền hủy ca!');
     if (session.isLocked) return alert('Ngày này đã khóa sổ! Hãy mở khóa nếu muốn chỉnh sửa.');
     const newStatus = session.status === 'CANCELLED' ? 'SCHEDULED' : 'CANCELLED';
     const res = await axios.put(`${API_URL}/daily-session/${session._id}/reschedule`, {
@@ -225,17 +306,20 @@ export default function App() {
   };
 
   const handleDeleteSession = async () => {
+    if (!isAdmin) return alert('Chỉ Admin mới có quyền xóa ca!');
     await axios.delete(`${API_URL}/daily-session/${editingSession._id}`);
     setSessions(sessions.filter(s => s._id !== editingSession._id));
     setEditingSession(null);
   };
 
   const handleDragStart = (e, sessionId) => {
+    if (!isAdmin) return;
     e.dataTransfer.setData('sessionId', sessionId);
   };
 
   const handleDropOnTrainer = async (e, targetTrainerId) => {
     e.preventDefault();
+    if (!isAdmin) return;
     const sessionId = e.dataTransfer.getData('sessionId');
     if (!sessionId) return;
     const res = await axios.put(`${API_URL}/daily-session/${sessionId}/reschedule`, {
@@ -246,6 +330,7 @@ export default function App() {
   };
 
   const handleToggleTrainerOff = async (trainerId) => {
+    if (!isAdmin) return alert('Chỉ Admin mới có quyền báo OFF Huấn Luyện Viên!');
     const res = await axios.post(`${API_URL}/daily-schedule/toggle-off`, {
       date: selectedDate,
       trainerId
@@ -254,6 +339,7 @@ export default function App() {
   };
 
   const openQuickAddForTrainer = (trainerId) => {
+    if (!isAdmin) return alert('Chỉ Admin mới có quyền thêm ca tập mới!');
     setAddForm({
       trainerId,
       clientId: '',
@@ -269,6 +355,7 @@ export default function App() {
 
   const handleAddSession = async (e) => {
     e.preventDefault();
+    if (!isAdmin) return alert('Chỉ Admin mới có quyền thêm ca!');
     let combinedName = addForm.clientName.trim();
 
     if (addForm.isDouble && addForm.secondClientName.trim()) {
@@ -276,7 +363,6 @@ export default function App() {
     }
 
     const finalClientName = formatSessionNameWithDouble(combinedName, addForm.isDouble);
-
     const res = await axios.post(`${API_URL}/daily-session/add`, {
       date: selectedDate,
       trainerId: addForm.trainerId,
@@ -299,16 +385,19 @@ export default function App() {
   };
 
   const handleCloseDay = async () => {
+    if (!isAdmin) return alert('Chỉ Admin mới có quyền Chốt ca!');
     const res = await axios.post(`${API_URL}/daily-schedule/close`, { date: selectedDate });
     setSessions(res.data);
   };
 
   const handleReopenDay = async () => {
+    if (!isAdmin) return alert('Chỉ Admin mới có quyền Mở khóa!');
     const res = await axios.post(`${API_URL}/daily-schedule/reopen`, { date: selectedDate });
     setSessions(res.data);
   };
 
   const handleSaveClientWeekly = async () => {
+    if (!isAdmin) return alert('Chỉ Admin mới có quyền sửa lịch tuần!');
     const payload = {
       ...editingClient,
       packageNote: attachUpdateTimestamp(editingClient.packageNote)
@@ -316,6 +405,44 @@ export default function App() {
     const res = await axios.put(`${API_URL}/clients/${editingClient._id}`, payload);
     setClients(clients.map(c => (c._id === editingClient._id ? res.data : c)));
     setEditingClient(null);
+  };
+
+  // Nút bật toàn bộ khách hàng sang trạng thái OFF (PAUSED) để chuẩn bị xếp lịch tuần mới
+  const handlePauseAllClients = async () => {
+    if (!isAdmin) return alert('Chỉ Admin mới có quyền chuyển toàn bộ học viên sang OFF!');
+    const confirm = window.confirm(
+      'BẠN CÓ CHẮC CHẮN MUỐN CHUYỂN TOÀN BỘ HỌC VIÊN SANG TRẠNG THÁI TẠM NGHỈ (OFF)?\\n\\n' +
+      '• Toàn bộ học viên sẽ chuyển thành PAUSED để bạn kiểm tra ai xác nhận tập lại.\\n' +
+      '• Khi học viên báo lịch tập mới, bạn chỉ cần sửa lại trạng thái "Đang tập" và điền giờ.'
+    );
+    if (!confirm) return;
+
+    try {
+      const res = await axios.post(`${API_URL}/clients/pause-all`);
+      alert(res.data.message);
+      setClients(res.data.clients);
+    } catch (err) {
+      alert('Lỗi: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  // Nút xóa vĩnh viễn 1 khách hàng trong Modal Cập nhật lịch
+  const handleDeleteClient = async (client) => {
+    if (!isAdmin) return alert('Chỉ Admin mới có quyền xóa học viên!');
+    const confirm = window.confirm(
+      `BẠN CÓ CHẮC CHẮN MUỐN XÓA VĨNH VIỄN KHÁCH HÀNG: "${client.name.toUpperCase()}"?\\n\\n` +
+      '• Toàn bộ thông tin và lịch tập cố định tuần của khách này sẽ bị xóa khỏi cơ sở dữ liệu.'
+    );
+    if (!confirm) return;
+
+    try {
+      await axios.delete(`${API_URL}/clients/${client._id}`);
+      setClients(clients.filter(c => c._id !== client._id));
+      setEditingClient(null);
+      alert(`Đã xóa thành công học viên ${client.name}!`);
+    } catch (err) {
+      alert('Lỗi khi xóa khách: ' + (err.response?.data?.error || err.message));
+    }
   };
 
   const loadWeeklySummary = async (customStart = startDate, customEnd = endDate) => {
@@ -334,11 +461,12 @@ export default function App() {
   };
 
   const handleDeleteMonthSessions = async () => {
+    if (!isAdmin) return alert('Chỉ Admin mới có quyền xóa dữ liệu tháng!');
     const { start, end, label } = getMonthRange(selectedMonth);
     const confirmMsg =
-      `BẠN CÓ CHẮC CHẮN MUỐN XÓA DỮ LIỆU CHỐT CA CỦA ${label.toUpperCase()}?\n\n` +
-      `• Khoảng thời gian xóa: Từ ${start} đến ${end}\n` +
-      `• Danh sách 48 khách hàng và Lịch Tuần cố định vẫn được GIỮ NGUYÊN 100%.\n` +
+      `BẠN CÓ CHẮC CHẮN MUỐN XÓA DỮ LIỆU CHỐT CA CỦA ${label.toUpperCase()}?\\n\\n` +
+      `• Khoảng thời gian xóa: Từ ${start} đến ${end}\\n` +
+      `• Danh sách khách hàng và Lịch Tuần cố định vẫn được GIỮ NGUYÊN 100%.\\n` +
       `• Hãy chắc chắn bạn đã bấm "Xuất Excel" để lưu báo cáo tháng trước khi xóa!`;
 
     if (!window.confirm(confirmMsg)) return;
@@ -356,6 +484,91 @@ export default function App() {
     }
   };
 
+  // ==================== NẾU CHƯA ĐĂNG NHẬP: HIỆN GIAO DIỆN LOGIN / REGISTER ====================
+  if (!currentUser) {
+    return (
+      <div className="AuthBackdrop">
+        <div className="AuthCard">
+          <img src="/logo.png" alt="Logo" className="AuthLogo" />
+          <h2 className="AuthTitle">GYM DINHLE</h2>
+          <div className="AuthSub">Fitness Center & Personal Trainer Management</div>
+
+          <div className="AuthTabs">
+            <button
+              onClick={() => { setAuthMode('LOGIN'); setAuthError(''); }}
+              className={`AuthTabBtn ${authMode === 'LOGIN' ? 'active' : ''}`}
+            >
+              🔐 Đăng Nhập
+            </button>
+            <button
+              onClick={() => { setAuthMode('REGISTER'); setAuthError(''); }}
+              className={`AuthTabBtn ${authMode === 'REGISTER' ? 'active' : ''}`}
+            >
+              📝 Đăng Ký PT
+            </button>
+          </div>
+
+          {authError && <div className="AuthErrorBox">⚠️ {authError}</div>}
+
+          <form onSubmit={handleAuthSubmit} className="AuthForm">
+            {authMode === 'REGISTER' && (
+              <label className="AuthLabel">
+                <span>Họ và Tên Huấn Luyện Viên:</span>
+                <input
+                  type="text"
+                  required
+                  placeholder="VD: Nguyễn Văn A (PT)"
+                  value={authForm.name}
+                  onChange={e => setAuthForm({ ...authForm, name: e.target.value })}
+                  className="AuthInput"
+                />
+              </label>
+            )}
+
+            <label className="AuthLabel">
+              <span>Tên đăng nhập:</span>
+              <input
+                type="text"
+                required
+                placeholder={authMode === 'LOGIN' ? 'Tài khoản admin hoặc PT' : 'Tên tài khoản (viết liền)'}
+                value={authForm.username}
+                onChange={e => setAuthForm({ ...authForm, username: e.target.value })}
+                className="AuthInput"
+              />
+            </label>
+
+            <label className="AuthLabel">
+              <span>Mật khẩu:</span>
+              <input
+                type="password"
+                required
+                placeholder="Nhập mật khẩu"
+                value={authForm.password}
+                onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+                className="AuthInput"
+              />
+            </label>
+
+            <button type="submit" disabled={authLoading} className="AuthSubmitBtn">
+              {authLoading
+                ? 'Đang xử lý...'
+                : authMode === 'LOGIN'
+                ? 'Đăng Nhập Vào Hệ Thống'
+                : 'Tạo Tài Khoản Huấn Luyện Viên'}
+            </button>
+          </form>
+
+          <div className="AuthHint">
+            🔒 <strong>Tài khoản Admin:</strong> <code>dinhle</code> / <code>dinhle123</code>
+            <br />
+            👥 <strong>Tài khoản PT:</strong> Có thể bấm qua mục <em>"Đăng Ký PT"</em> để tạo tài khoản xem lịch.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==================== ĐÃ ĐĂNG NHẬP: GIAO DIỆN CHÍNH ====================
   const isDayLocked = sessions.some(s => s.isLocked);
   const validDaySessions = sessions.filter(s => s.status !== 'CANCELLED');
   const totalValidShifts = validDaySessions.length;
@@ -364,8 +577,11 @@ export default function App() {
     s => s.status === 'CANCELLED' && s.clientName !== 'OFF'
   ).length;
 
+  const pausedClientsCount = clients.filter(c => c.status === 'PAUSED').length;
+
   const displayedClients = clients
     .filter(c => filterTrainer === 'ALL' || (c.primaryTrainerId?._id || c.primaryTrainerId) === filterTrainer)
+    .filter(c => filterStatus === 'ALL' || c.status === filterStatus)
     .filter(c => c.name.toLowerCase().includes(searchClient.toLowerCase()))
     .sort((a, b) => {
       if (sortClientMode !== 'RECENT') return 0;
@@ -399,28 +615,40 @@ export default function App() {
             </div>
           </div>
 
-          <div className="NavGroup">
-            <button
-              onClick={() => setActiveTab('DAILY')}
-              className={`NavBtn ${activeTab === 'DAILY' ? 'active' : ''}`}
-            >
-              📅 Lịch Ngày
-            </button>
-            <button
-              onClick={() => setActiveTab('CLIENTS')}
-              className={`NavBtn ${activeTab === 'CLIENTS' ? 'active' : ''}`}
-            >
-              👥 Lịch Tuần ({clients.length})
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('SUMMARY');
-                loadWeeklySummary();
-              }}
-              className={`NavBtn ${activeTab === 'SUMMARY' ? 'active' : ''}`}
-            >
-              📊 Tổng Hợp & Dọn Tháng
-            </button>
+          <div className="HeaderRightSide">
+            <div className="NavGroup">
+              <button
+                onClick={() => setActiveTab('DAILY')}
+                className={`NavBtn ${activeTab === 'DAILY' ? 'active' : ''}`}
+              >
+                📅 Lịch Ngày
+              </button>
+              <button
+                onClick={() => setActiveTab('CLIENTS')}
+                className={`NavBtn ${activeTab === 'CLIENTS' ? 'active' : ''}`}
+              >
+                👥 Lịch Tuần ({clients.length})
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('SUMMARY');
+                  loadWeeklySummary();
+                }}
+                className={`NavBtn ${activeTab === 'SUMMARY' ? 'active' : ''}`}
+              >
+                📊 Tổng Hợp & Dọn Tháng
+              </button>
+            </div>
+
+            <div className="UserBadge">
+              <span>{currentUser.name}</span>
+              <span className={`RoleTag ${isAdmin ? 'admin' : 'pt'}`}>
+                {isAdmin ? 'ADMIN' : 'PT'}
+              </span>
+              <button onClick={handleLogout} className="LogoutBtn" title="Đăng xuất tài khoản">
+                🚪 Thoát
+              </button>
+            </div>
           </div>
         </header>
       )}
@@ -453,16 +681,29 @@ export default function App() {
                   </button>
                 </div>
 
+                {/* Nút xem danh sách khách đang OFF */}
                 <button
-                  onClick={() => openQuickAddForTrainer(trainers[0]?._id || '')}
-                  className="Btn BtnBlue"
+                  onClick={() => setShowPausedModal(true)}
+                  className="PausedBadgeBtn"
+                  title="Xem danh sách những khách hàng đang tạm nghỉ / OFF"
                 >
-                  + Thêm Ca / Ca Đôi
+                  ⏸ Đang OFF: <strong>{pausedClientsCount} khách</strong>
                 </button>
 
-                <button onClick={handleResyncFromWeekly} className="Btn BtnLight">
-                  🔄 Đồng Bộ Tuần
-                </button>
+                {isAdmin && (
+                  <>
+                    <button
+                      onClick={() => openQuickAddForTrainer(trainers[0]?._id || '')}
+                      className="Btn BtnBlue"
+                    >
+                      + Thêm Ca / Ca Đôi
+                    </button>
+
+                    <button onClick={handleResyncFromWeekly} className="Btn BtnLight">
+                      🔄 Đồng Bộ Tuần
+                    </button>
+                  </>
+                )}
               </div>
 
               <div className="ToolSection">
@@ -477,14 +718,16 @@ export default function App() {
                   📥 Xuất Excel
                 </button>
 
-                {!isDayLocked ? (
-                  <button onClick={handleCloseDay} className="Btn BtnGreen">
-                    ✅ Chốt Ca
-                  </button>
-                ) : (
-                  <button onClick={handleReopenDay} className="Btn BtnOrange">
-                    🔓 Mở Khóa
-                  </button>
+                {isAdmin && (
+                  !isDayLocked ? (
+                    <button onClick={handleCloseDay} className="Btn BtnGreen">
+                      ✅ Chốt Ca
+                    </button>
+                  ) : (
+                    <button onClick={handleReopenDay} className="Btn BtnOrange">
+                      🔓 Mở Khóa
+                    </button>
+                  )
                 )}
               </div>
             </div>
@@ -521,6 +764,7 @@ export default function App() {
                 </div>
               </div>
 
+              {/* CHẾ ĐỘ 1: BẢNG MA TRẬN CHỐNG CẮT CHỮ TRIỆT ĐỂ */}
               {dailyLayout === 'BOARD' ? (
                 <div className="TableScrollBox">
                   <table className="MatrixTable">
@@ -535,24 +779,32 @@ export default function App() {
                             <th key={trainer._id} className="ThTrainer">
                               <div className="TrainerName" title={trainer.name}>{trainer.name}</div>
                               <div className="TrainerActionRow">
-                                <button
-                                  onClick={() => openQuickAddForTrainer(trainer._id)}
-                                  className="MiniTagBtn"
-                                  style={{ background: '#2563eb', color: '#fff' }}
-                                >
-                                  + Ca
-                                </button>
-                                <button
-                                  onClick={() => handleToggleTrainerOff(trainer._id)}
-                                  className="MiniTagBtn"
-                                  style={{
-                                    background: isOff ? '#f59e0b' : '#fff',
-                                    color: isOff ? '#fff' : '#475569',
-                                    border: '1px solid #94a3b8'
-                                  }}
-                                >
-                                  {isOff ? 'Đang OFF' : 'OFF'}
-                                </button>
+                                {isAdmin ? (
+                                  <>
+                                    <button
+                                      onClick={() => openQuickAddForTrainer(trainer._id)}
+                                      className="MiniTagBtn"
+                                      style={{ background: '#2563eb', color: '#fff' }}
+                                    >
+                                      + Ca
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleTrainerOff(trainer._id)}
+                                      className="MiniTagBtn"
+                                      style={{
+                                        background: isOff ? '#f59e0b' : '#fff',
+                                        color: isOff ? '#fff' : '#475569',
+                                        border: '1px solid #94a3b8'
+                                      }}
+                                    >
+                                      {isOff ? 'Đang OFF' : 'OFF'}
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span style={{ fontSize: '11px', color: isOff ? '#b45309' : '#166534', fontWeight: 700 }}>
+                                    {isOff ? 'OFF' : 'Hoạt động'}
+                                  </span>
+                                )}
                               </div>
                             </th>
                           );
@@ -585,7 +837,7 @@ export default function App() {
                               >
                                 {cellSession && (
                                   <div
-                                    draggable={!cellSession.isLocked && !isOffMarker}
+                                    draggable={isAdmin && !cellSession.isLocked && !isOffMarker}
                                     onDragStart={e => handleDragStart(e, cellSession._id)}
                                     onClick={() => openEditModal(cellSession)}
                                     className={`SessionCard ${isDouble ? 'double-shift' : ''} ${
@@ -599,23 +851,8 @@ export default function App() {
                                         NGHỈ PHÉP (OFF)
                                       </span>
                                     ) : isDouble ? (
+                                      /* CA ĐÔI: HIỂN THỊ TÊN 2 KHÁCH XẾP DÒNG DỌC KHÔNG CẮT CHỮ */
                                       <>
-                                        <div className="DoubleTopBar">
-                                          <span className="DoubleBadge">👥 Ca đôi</span>
-                                          <div className="DoubleRightControls">
-                                            <span className="TimePill">{cellSession.time || 'h'}</span>
-                                            {!cellSession.isLocked && (
-                                              <button
-                                                onClick={e => handleQuickToggleCancel(cellSession, e)}
-                                                className="CancelBtn"
-                                                title={isCancelled ? 'Khôi phục' : 'Gạch hủy ca'}
-                                              >
-                                                {isCancelled ? '↺' : '✕'}
-                                              </button>
-                                            )}
-                                          </div>
-                                        </div>
-
                                         <div
                                           className="DoubleNamesStack"
                                           style={{
@@ -629,23 +866,42 @@ export default function App() {
                                             </div>
                                           ))}
                                         </div>
+
+                                        <div className="SessionBottomRow">
+                                          <span className="DoubleBadge">👥 Ca đôi</span>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <span className="TimePill">{cellSession.time || 'h'}</span>
+                                            {isAdmin && !cellSession.isLocked && (
+                                              <button
+                                                onClick={e => handleQuickToggleCancel(cellSession, e)}
+                                                className="CancelBtn"
+                                                title={isCancelled ? 'Khôi phục' : 'Gạch hủy ca'}
+                                              >
+                                                {isCancelled ? '↺' : '✕'}
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
                                       </>
                                     ) : (
-                                      <div className="SingleRowLayout">
-                                        <span
-                                          className="ClientTitle"
-                                          style={{
-                                            textDecoration: isCancelled ? 'line-through' : 'none'
-                                          }}
-                                        >
-                                          {getCleanSessionName(cellSession.clientName)}
-                                        </span>
+                                      /* CA ĐƠN: TÊN ĐƯỢC ƯU TIÊN TRÊN CÙNG CHIẾM 100% CHIỀU RỘNG */
+                                      <>
+                                        <div className="SessionTopRow">
+                                          <span
+                                            className="ClientTitle"
+                                            style={{
+                                              textDecoration: isCancelled ? 'line-through' : 'none'
+                                            }}
+                                          >
+                                            {getCleanSessionName(cellSession.clientName)}
+                                          </span>
+                                        </div>
 
-                                        <div className="DoubleRightControls">
+                                        <div className="SessionBottomRow">
                                           <span className="TimePill">
                                             {cellSession.time || 'h'}
                                           </span>
-                                          {!cellSession.isLocked && (
+                                          {isAdmin && !cellSession.isLocked && (
                                             <button
                                               onClick={e => handleQuickToggleCancel(cellSession, e)}
                                               className="CancelBtn"
@@ -655,7 +911,7 @@ export default function App() {
                                             </button>
                                           )}
                                         </div>
-                                      </div>
+                                      </>
                                     )}
                                   </div>
                                 )}
@@ -665,6 +921,7 @@ export default function App() {
                         </tr>
                       ))}
 
+                      {/* DÒNG CHỐT CA CUỐI BẢNG */}
                       <tr className="FooterRow">
                         <td className="StickyCol" style={{ background: '#0f172a', color: '#fff' }}>
                           Chốt
@@ -694,6 +951,7 @@ export default function App() {
                   </table>
                 </div>
               ) : (
+                /* CHẾ ĐỘ 2: THẺ THEO TỪNG PT */
                 <div className="TrainerCardsGrid">
                   {trainers.map(trainer => {
                     const ptSessions = getSortedTrainerSessions(trainer._id);
@@ -736,23 +994,27 @@ export default function App() {
                           </div>
 
                           <div style={{ display: 'flex', gap: '5px' }}>
-                            <button
-                              onClick={() => openQuickAddForTrainer(trainer._id)}
-                              className="MiniTagBtn"
-                              style={{ background: '#2563eb', color: '#fff' }}
-                            >
-                              + Ca
-                            </button>
-                            <button
-                              onClick={() => handleToggleTrainerOff(trainer._id)}
-                              className="MiniTagBtn"
-                              style={{
-                                background: isOff ? '#f59e0b' : '#f1f5f9',
-                                color: isOff ? '#fff' : '#475569'
-                              }}
-                            >
-                              OFF
-                            </button>
+                            {isAdmin && (
+                              <>
+                                <button
+                                  onClick={() => openQuickAddForTrainer(trainer._id)}
+                                  className="MiniTagBtn"
+                                  style={{ background: '#2563eb', color: '#fff' }}
+                                >
+                                  + Ca
+                                </button>
+                                <button
+                                  onClick={() => handleToggleTrainerOff(trainer._id)}
+                                  className="MiniTagBtn"
+                                  style={{
+                                    background: isOff ? '#f59e0b' : '#f1f5f9',
+                                    color: isOff ? '#fff' : '#475569'
+                                  }}
+                                >
+                                  OFF
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -795,9 +1057,9 @@ export default function App() {
                                         {getCleanSessionName(cellSession.clientName)}
                                       </span>
 
-                                      <div className="DoubleRightControls">
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                         <span className="TimePill">{cellSession.time || 'h'}</span>
-                                        {!cellSession.isLocked && (
+                                        {isAdmin && !cellSession.isLocked && (
                                           <button
                                             onClick={e => handleQuickToggleCancel(cellSession, e)}
                                             className="CancelBtn"
@@ -823,7 +1085,7 @@ export default function App() {
         </>
       )}
 
-      {/* ==================== TAB 2: QUẢN LÝ LỊCH TUẦN ==================== */}
+      {/* ==================== TAB 2: QUẢN LÝ LỊCH TUẦN & NÚT BẬT TOÀN BỘ KHÁCH OFF ==================== */}
       {activeTab === 'CLIENTS' && (
         <div className="MainArea">
           <div className="ToolbarCard" style={{ margin: '0 0 12px 0' }}>
@@ -840,6 +1102,16 @@ export default function App() {
               </select>
 
               <select
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value)}
+                style={styles.input}
+              >
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="ACTIVE">● Đang tập ({clients.filter(c => c.status === 'ACTIVE').length})</option>
+                <option value="PAUSED">⏸ Tạm nghỉ / OFF ({pausedClientsCount})</option>
+              </select>
+
+              <select
                 value={sortClientMode}
                 onChange={e => setSortClientMode(e.target.value)}
                 style={styles.input}
@@ -853,24 +1125,37 @@ export default function App() {
                 placeholder="🔍 Tìm tên khách hàng..."
                 value={searchClient}
                 onChange={e => setSearchClient(e.target.value)}
-                style={{ ...styles.input, flex: 1, minWidth: '180px' }}
+                style={{ ...styles.input, flex: 1, minWidth: '160px' }}
               />
             </div>
 
-            <button
-              onClick={() =>
-                setEditingClient({
-                  name: '',
-                  primaryTrainerId: trainers[0]?._id || '',
-                  status: 'ACTIVE',
-                  packageNote: '',
-                  weeklySchedule: []
-                })
-              }
-              className="Btn BtnBlue"
-            >
-              + Thêm Khách Mới
-            </button>
+            {isAdmin && (
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {/* Nút bật toàn bộ khách hàng sang trạng thái OFF */}
+                <button
+                  onClick={handlePauseAllClients}
+                  className="Btn BtnOrange"
+                  title="Chuyển toàn bộ khách hàng sang Tạm nghỉ (OFF) để kiểm tra ai tập tuần mới"
+                >
+                  ⏸ Chuyển Toàn Bộ Sang OFF
+                </button>
+
+                <button
+                  onClick={() =>
+                    setEditingClient({
+                      name: '',
+                      primaryTrainerId: trainers[0]?._id || '',
+                      status: 'ACTIVE',
+                      packageNote: '',
+                      weeklySchedule: []
+                    })
+                  }
+                  className="Btn BtnBlue"
+                >
+                  + Thêm Khách Mới
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="ClientCardsGrid">
@@ -900,7 +1185,7 @@ export default function App() {
                         color: client.status === 'ACTIVE' ? '#166534' : '#92400e'
                       }}
                     >
-                      {client.status === 'ACTIVE' ? '● Đang tập' : '⏸ Tạm nghỉ'}
+                      {client.status === 'ACTIVE' ? '● Đang tập' : '⏸ Tạm nghỉ (OFF)'}
                     </span>
                   </div>
 
@@ -954,7 +1239,7 @@ export default function App() {
                       className="Btn BtnLight"
                       style={{ width: '100%' }}
                     >
-                      ✏️ Chỉnh Sửa Lịch Tuần
+                      {isAdmin ? '✏️ Chỉnh Sửa / Xóa Khách' : '👁️ Xem Chi Tiết Lịch'}
                     </button>
                   </div>
                 </div>
@@ -998,9 +1283,11 @@ export default function App() {
                 📥 Xuất Excel ({startDate.slice(5)} → {endDate.slice(5)})
               </button>
 
-              <button onClick={handleDeleteMonthSessions} className="Btn BtnRed">
-                🗑 Xóa Chốt Ca {currentMonthInfo.label}
-              </button>
+              {isAdmin && (
+                <button onClick={handleDeleteMonthSessions} className="Btn BtnRed">
+                  🗑 Xóa Chốt Ca {currentMonthInfo.label}
+                </button>
+              )}
             </div>
           </div>
 
@@ -1061,7 +1348,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ==================== 3 HỘP THOẠI MODAL TÁCH RIÊNG ==================== */}
+      {/* ==================== 4 HỘP THOẠI MODAL ==================== */}
       <Modals
         selectedDate={selectedDate}
         trainers={trainers}
@@ -1082,6 +1369,10 @@ export default function App() {
         editingClient={editingClient}
         setEditingClient={setEditingClient}
         handleSaveClientWeekly={handleSaveClientWeekly}
+        handleDeleteClient={handleDeleteClient}
+        showPausedModal={showPausedModal}
+        setShowPausedModal={setShowPausedModal}
+        isAdmin={isAdmin}
       />
     </div>
   );

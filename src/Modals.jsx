@@ -28,12 +28,18 @@ export default function Modals({
   handleAddSession,
   editingClient,
   setEditingClient,
-  handleSaveClientWeekly
+  handleSaveClientWeekly,
+  handleDeleteClient,
+  showPausedModal,
+  setShowPausedModal,
+  isAdmin
 }) {
+  const pausedClients = clients.filter(c => c.status === 'PAUSED');
+
   return (
     <>
-      {/* ==================== MODAL XẾP LẠI LỊCH (CÓ TÍCH CA ĐÔI & GỘP CA) ==================== */}
-      {editingSession && (
+      {/* ==================== 1. MODAL XẾP LẠI CA ==================== */}
+      {editingSession && isAdmin && (
         <div style={styles.modalBackdrop}>
           <form onSubmit={handleSaveReschedule} style={styles.modalCard}>
             <h3 style={styles.modalTitle}>
@@ -50,7 +56,6 @@ export default function Modals({
               />
             </label>
 
-            {/* Khung bật/tắt Ca Đôi (tính 1 ca, ghi chú ở Chốt ca) */}
             <div
               style={{
                 background: editForm.isDouble ? '#f5f3ff' : '#f8fafc',
@@ -109,7 +114,7 @@ export default function Modals({
                   {!editForm.mergeWithSessionId && (
                     <label style={{ ...styles.fieldGroup, marginBottom: 0 }}>
                       <span style={{ fontSize: '12px', color: '#475569' }}>
-                        Hoặc nhập/chọn thêm tên khách thứ 2 tập cùng:
+                        Hoặc nhập tên khách thứ 2 tập cùng:
                       </span>
                       <input
                         type="text"
@@ -201,13 +206,12 @@ export default function Modals({
         </div>
       )}
 
-      {/* ==================== MODAL THÊM CA TẬP (HỖ TRỢ XẾP CA ĐÔI) ==================== */}
-      {showAddModal && (
+      {/* ==================== 2. MODAL THÊM CA TẬP (HỖ TRỢ NHẬN BIẾT KHÁCH OFF) ==================== */}
+      {showAddModal && isAdmin && (
         <div style={styles.modalBackdrop}>
           <form onSubmit={handleAddSession} style={styles.modalCard}>
             <h3 style={styles.modalTitle}>Thêm Ca Tập ({selectedDate})</h3>
 
-            {/* Nút tích chọn Ca Đôi */}
             <div
               style={{
                 background: addForm.isDouble ? '#f5f3ff' : '#f8fafc',
@@ -254,7 +258,9 @@ export default function Modals({
               >
                 <option value="">-- Nhập tên khách mới --</option>
                 {clients.map(c => (
-                  <option key={c._id} value={c._id}>{c.name}</option>
+                  <option key={c._id} value={c._id}>
+                    {c.status === 'PAUSED' ? `⚠️ [ĐANG OFF] ${c.name}` : c.name}
+                  </option>
                 ))}
               </select>
             </label>
@@ -271,7 +277,6 @@ export default function Modals({
               />
             </label>
 
-            {/* Nếu bật Ca Đôi thì hiện thêm ô chọn/nhập Khách thứ 2 */}
             {addForm.isDouble && (
               <div
                 style={{
@@ -298,7 +303,9 @@ export default function Modals({
                   >
                     <option value="">-- Tự gõ tên khách thứ 2 ở dưới --</option>
                     {clients.map(c => (
-                      <option key={c._id} value={c._id}>{c.name}</option>
+                      <option key={c._id} value={c._id}>
+                        {c.status === 'PAUSED' ? `⚠️ [ĐANG OFF] ${c.name}` : c.name}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -362,10 +369,10 @@ export default function Modals({
         </div>
       )}
 
-      {/* ==================== MODAL SỬA LỊCH TUẦN KHÁCH HÀNG ==================== */}
+      {/* ==================== 3. MODAL SỬA LỊCH TUẦN & XÓA KHÁCH HÀNG ==================== */}
       {editingClient && (
         <div style={styles.modalBackdrop}>
-          <div style={{ ...styles.modalCard, width: '500px' }}>
+          <div style={{ ...styles.modalCard, width: '520px' }}>
             <h3 style={{ ...styles.modalTitle, marginBottom: '6px' }}>
               {editingClient._id ? `Lịch Tuần: ${editingClient.name}` : 'Thêm Khách Hàng Mới'}
             </h3>
@@ -392,6 +399,7 @@ export default function Modals({
                 <span>Tên khách hàng:</span>
                 <input
                   type="text"
+                  disabled={!isAdmin}
                   value={editingClient.name}
                   onChange={e => setEditingClient({ ...editingClient, name: e.target.value })}
                   style={styles.input}
@@ -401,6 +409,7 @@ export default function Modals({
               <label style={styles.fieldGroup}>
                 <span>PT phụ trách chính:</span>
                 <select
+                  disabled={!isAdmin}
                   value={editingClient.primaryTrainerId}
                   onChange={e => setEditingClient({ ...editingClient, primaryTrainerId: e.target.value })}
                   style={styles.input}
@@ -414,14 +423,15 @@ export default function Modals({
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <label style={styles.fieldGroup}>
-                <span>Trạng thái:</span>
+                <span>Trạng thái tập:</span>
                 <select
+                  disabled={!isAdmin}
                   value={editingClient.status}
                   onChange={e => setEditingClient({ ...editingClient, status: e.target.value })}
                   style={styles.input}
                 >
-                  <option value="ACTIVE">Đang tập</option>
-                  <option value="PAUSED">Tạm nghỉ (Off 1 tuần)</option>
+                  <option value="ACTIVE">● Đang tập (ACTIVE)</option>
+                  <option value="PAUSED">⏸ Tạm nghỉ (OFF 1 tuần / Bảo lưu)</option>
                 </select>
               </label>
 
@@ -429,6 +439,7 @@ export default function Modals({
                 <span>Ghi chú gói tập:</span>
                 <input
                   type="text"
+                  disabled={!isAdmin}
                   value={editingClient.packageNote || ''}
                   onChange={e => setEditingClient({ ...editingClient, packageNote: e.target.value })}
                   style={styles.input}
@@ -457,8 +468,10 @@ export default function Modals({
                       <label style={{ width: '85px', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         <input
                           type="checkbox"
+                          disabled={!isAdmin}
                           checked={isChecked}
                           onChange={e => {
+                            if (!isAdmin) return;
                             if (e.target.checked) {
                               setEditingClient({
                                 ...editingClient,
@@ -483,6 +496,7 @@ export default function Modals({
                           <input
                             type="text"
                             placeholder="Giờ"
+                            disabled={!isAdmin}
                             value={slot.time}
                             onChange={e =>
                               setEditingClient({
@@ -495,6 +509,7 @@ export default function Modals({
                             style={{ ...styles.input, width: '95px' }}
                           />
                           <select
+                            disabled={!isAdmin}
                             value={slot.assignedTrainerId || editingClient.primaryTrainerId}
                             onChange={e =>
                               setEditingClient({
@@ -518,27 +533,109 @@ export default function Modals({
               </div>
             </div>
 
-            <div style={{ ...styles.modalFooter, justifyContent: 'flex-end' }}>
-              <button onClick={() => setEditingClient(null)} className="Btn BtnLight">
+            {/* Chân Modal: Nút Xóa Khách Hàng (Dành cho Admin) + Nút Lưu */}
+            <div style={styles.modalFooter}>
+              {editingClient._id && isAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteClient(editingClient)}
+                  className="Btn BtnRed"
+                >
+                  🗑 Xóa Khách Hàng
+                </button>
+              ) : <div />}
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setEditingClient(null)} className="Btn BtnLight">
+                  Đóng
+                </button>
+                {isAdmin && (
+                  <button
+                    onClick={async () => {
+                      if (editingClient._id) {
+                        await handleSaveClientWeekly();
+                      } else {
+                        const payload = {
+                          ...editingClient,
+                          packageNote: attachUpdateTimestamp(editingClient.packageNote)
+                        };
+                        const res = await axios.post(`${API_URL}/clients`, payload);
+                        setClients([...clients, res.data]);
+                        setEditingClient(null);
+                      }
+                    }}
+                    className="Btn BtnBlue"
+                  >
+                    Lưu Lịch Tuần
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 4. MODAL DANH SÁCH KHÁCH ĐANG OFF ==================== */}
+      {showPausedModal && (
+        <div style={styles.modalBackdrop}>
+          <div style={{ ...styles.modalCard, width: '500px' }}>
+            <h3 style={{ ...styles.modalTitle, color: '#b45309' }}>
+              ⏸ Danh Sách Khách Đang Tạm Nghỉ / OFF ({pausedClients.length})
+            </h3>
+            <p style={{ fontSize: '12.5px', color: '#64748b', marginTop: '-8px', marginBottom: '14px' }}>
+              Những học viên này đang bảo lưu hoặc nghỉ tập trong tuần, không nên xếp ca vào lịch ngày.
+            </p>
+
+            {pausedClients.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#16a34a', fontWeight: 700 }}>
+                ✅ Hiện tại không có khách hàng nào đang OFF!
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '55vh', overflowY: 'auto' }}>
+                {pausedClients.map(c => (
+                  <div
+                    key={c._id}
+                    style={{
+                      background: '#fffbeb',
+                      border: '1px solid #fde68a',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <div>
+                      <strong style={{ fontSize: '14px', color: '#0f172a' }}>{c.name}</strong>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                        PT chính: <strong style={{ color: '#1e293b' }}>{c.primaryTrainerId?.name || '—'}</strong>
+                        {c.packageNote && ` • Ghi chú: ${c.packageNote.replace(/@@UPD:.*$/, '')}`}
+                      </div>
+                    </div>
+
+                    {isAdmin && (
+                      <button
+                        onClick={() => {
+                          setShowPausedModal(false);
+                          setEditingClient({
+                            ...c,
+                            primaryTrainerId: c.primaryTrainerId?._id || c.primaryTrainerId
+                          });
+                        }}
+                        className="Btn BtnLight"
+                        style={{ padding: '4px 8px', fontSize: '11px' }}
+                      >
+                        ✏️ Sửa
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ ...styles.modalFooter, justifyContent: 'flex-end', marginTop: '16px' }}>
+              <button onClick={() => setShowPausedModal(false)} className="Btn BtnDark">
                 Đóng
-              </button>
-              <button
-                onClick={async () => {
-                  if (editingClient._id) {
-                    await handleSaveClientWeekly();
-                  } else {
-                    const payload = {
-                      ...editingClient,
-                      packageNote: attachUpdateTimestamp(editingClient.packageNote)
-                    };
-                    const res = await axios.post(`${API_URL}/clients`, payload);
-                    setClients([...clients, res.data]);
-                    setEditingClient(null);
-                  }
-                }}
-                className="Btn BtnBlue"
-              >
-                Lưu Lịch Tuần
               </button>
             </div>
           </div>

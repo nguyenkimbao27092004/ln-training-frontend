@@ -18,8 +18,8 @@ export const DOUBLE_MARKER = '[CA ĐÔI]';
 
 export const styles = {
   input: { padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', background: '#fff', color: '#0f172a' },
-  modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' },
-  modalCard: { background: '#fff', color: '#0f172a', padding: '20px', borderRadius: '14px', width: '440px', maxWidth: '96vw', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 35px rgba(0,0,0,0.25)', textAlign: 'left' },
+  modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.65)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' },
+  modalCard: { background: '#fff', color: '#0f172a', padding: '20px', borderRadius: '14px', width: '460px', maxWidth: '96vw', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 35px rgba(0,0,0,0.25)', textAlign: 'left' },
   modalTitle: { marginTop: 0, marginBottom: '14px', fontSize: '16.5px', fontWeight: 800, color: '#0f172a' },
   fieldGroup: { display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px', fontSize: '13px', fontWeight: 600, color: '#1e293b' },
   scopePanel: { background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', marginTop: '4px', color: '#1e293b' },
@@ -27,24 +27,20 @@ export const styles = {
   modalFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '18px', gap: '8px' }
 };
 
-// Kiểm tra xem ca tập có phải là Ca Đôi hay không
 export function isDoubleSession(sessionOrName) {
   const name = typeof sessionOrName === 'string' ? sessionOrName : (sessionOrName?.clientName || '');
   return name.toUpperCase().includes(DOUBLE_MARKER);
 }
 
-// Lấy tên khách sạch (bỏ nhãn [CA ĐÔI] để hiển thị đẹp trên giao diện)
 export function getCleanSessionName(rawName = '') {
   return rawName.replace(/\[CA ĐÔI\]/gi, '').trim();
 }
 
-// Gắn hoặc gỡ nhãn [CA ĐÔI] vào tên ca tập
 export function formatSessionNameWithDouble(cleanName = '', isDouble = false) {
   const pure = getCleanSessionName(cleanName);
   return isDouble ? `${pure} ${DOUBLE_MARKER}` : pure;
 }
 
-// Tách danh sách tên khách trong ca đôi (ngăn cách bởi dấu +) để xếp dòng gọn đẹp
 export function splitDoubleClientNames(rawName = '') {
   const clean = getCleanSessionName(rawName);
   if (clean.includes('+')) {
@@ -53,7 +49,6 @@ export function splitDoubleClientNames(rawName = '') {
   return [clean];
 }
 
-// Tách nội dung ghi chú gốc và mốc thời gian chỉnh sửa lịch tuần
 export function parseClientNoteAndTime(rawNote = '', fallbackUpdatedAt = null) {
   if (!rawNote) {
     return { cleanNote: '', updatedAt: fallbackUpdatedAt };
@@ -67,14 +62,12 @@ export function parseClientNoteAndTime(rawNote = '', fallbackUpdatedAt = null) {
   return { cleanNote, updatedAt: isoTime || fallbackUpdatedAt };
 }
 
-// Đính kèm mốc thời gian hiện tại khi lưu lịch tuần
 export function attachUpdateTimestamp(cleanNote = '') {
   const pureNote = parseClientNoteAndTime(cleanNote).cleanNote;
   const nowIso = new Date().toISOString();
   return `${pureNote}${UPD_MARKER}${nowIso}`;
 }
 
-// Định dạng hiển thị Giờ:Phút — Ngày/Tháng/Năm (VD: 08:45 — 15/11/2026)
 export function formatUpdateTime(isoStr) {
   if (!isoStr) return null;
   const d = new Date(isoStr);
@@ -95,7 +88,6 @@ export function getTodayStr() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// Lấy tháng hiện tại định dạng YYYY-MM (VD: 2026-11)
 export function getCurrentYearMonth() {
   const now = new Date();
   const yyyy = now.getFullYear();
@@ -103,7 +95,6 @@ export function getCurrentYearMonth() {
   return `${yyyy}-${mm}`;
 }
 
-// Tính ngày đầu tháng và cuối tháng từ chuỗi YYYY-MM (VD: 2026-11 -> 2026-11-01 đến 2026-11-30)
 export function getMonthRange(yearMonthStr) {
   const [y, m] = yearMonthStr.split('-').map(Number);
   const lastDay = new Date(y, m, 0).getDate();

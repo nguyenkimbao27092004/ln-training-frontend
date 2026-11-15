@@ -1,70 +1,212 @@
 /* Tệp: frontend/src/App.css */
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
-  margin: 0; padding: 0;
+  margin: 0;
+  padding: 0;
   background: #f1f5f9;
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
   color: #0f172a;
 }
-.app-shell { min-height: 100vh; width: 100%; display: flex; flex-direction: column; text-align: left; }
+
+.app-shell {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
 
 /* HEADER GYM DINHLE HIỆN ĐẠI */
 .ProHeader {
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  color: #fff; padding: 12px 18px;
-  display: flex; justify-content: space-between; align-items: center;
-  flex-wrap: wrap; gap: 12px;
+  color: #fff;
+  padding: 10px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
 }
-.BrandRow { display: flex; align-items: center; gap: 12px; }
+
+.BrandRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .BrandLogoImg {
-  width: 44px; height: 44px; border-radius: 10px;
-  object-fit: contain; background: #ffffff; padding: 2px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #ffffff;
+  padding: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
 }
-.BrandTitleWrap { display: flex; flex-direction: column; text-align: left; }
+
+.BrandTitleWrap {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
 .BrandText {
-  margin: 0 !important; font-size: 17px !important; font-weight: 800 !important;
-  letter-spacing: 0.3px !important; color: #ffffff !important;
-  line-height: 1.2 !important; white-space: nowrap;
+  margin: 0 !important;
+  font-size: 16.5px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.3px !important;
+  color: #ffffff !important;
+  line-height: 1.2 !important;
+  white-space: nowrap;
 }
+
 .BrandSub {
-  font-size: 11.5px; color: #94a3b8; font-weight: 500; margin-top: 2px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+  margin-top: 2px;
 }
+
+.HeaderRightSide {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.UserBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.RoleTag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.RoleTag.admin {
+  background: #dc2626;
+  color: #fff;
+}
+.RoleTag.pt {
+  background: #2563eb;
+  color: #fff;
+}
+
+.LogoutBtn {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+  padding: 5px 9px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.LogoutBtn:hover {
+  background: rgba(239, 68, 68, 0.8);
+  border-color: #ef4444;
+}
+
 .NavGroup {
-  display: flex; gap: 4px; background: rgba(255, 255, 255, 0.08);
-  padding: 4px; border-radius: 10px;
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 4px;
+  border-radius: 10px;
 }
+
 .NavBtn {
-  border: none; background: transparent; color: #cbd5e1;
-  padding: 7px 12px; border-radius: 7px; font-size: 13px;
-  font-weight: 600; cursor: pointer; white-space: nowrap; transition: 0.15s;
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: 0.15s;
 }
-.NavBtn.active { background: #3b82f6; color: #fff; box-shadow: 0 2px 6px rgba(59,130,246,0.35); }
+
+.NavBtn.active {
+  background: #3b82f6;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.35);
+}
 
 /* THANH CÔNG CỤ CHUẨN SAAS */
 .ToolbarCard {
-  background: #fff; margin: 10px 12px 0; padding: 10px 14px;
-  border-radius: 12px; border: 1px solid #e2e8f0;
-  display: flex; justify-content: space-between; align-items: center;
-  flex-wrap: wrap; gap: 10px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  background: #fff;
+  margin: 10px 12px 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
-.ToolSection { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.ToolSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .DateControl {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 3px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 3px 6px;
 }
+
 .DateInput {
-  border: none; background: transparent; font-size: 13.5px;
-  font-weight: 700; color: #0f172a; outline: none; min-width: 122px;
+  border: none;
+  background: transparent;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  outline: none;
+  min-width: 122px;
 }
+
 .Btn {
-  border: none; border-radius: 8px; padding: 8px 12px;
-  font-size: 12.5px; font-weight: 700; cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
-  gap: 5px; white-space: nowrap; transition: 0.15s;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: 0.15s;
 }
+
 .BtnBlue { background: #2563eb; color: #fff; }
 .BtnLight { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
 .BtnEmerald { background: #059669; color: #fff; }
@@ -73,224 +215,587 @@ body {
 .BtnDark { background: #1e293b; color: #fff; }
 .BtnRed { background: #e11d48; color: #fff; }
 
-/* KHUNG BẢNG LỊCH NGÀY FULL MÀN HÌNH & CỘT PT CHIA ĐỀU 100% */
-.MainArea { flex: 1; width: 100%; padding: 10px 12px 20px; }
-.BoardCard {
-  background: #fff; border-radius: 14px; border: 1px solid #cbd5e1;
-  overflow: hidden; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+/* Nút hiển thị danh sách khách đang OFF */
+.PausedBadgeBtn {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1.5px solid #fde68a;
+  padding: 7px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: 0.15s;
 }
-.BoardBanner {
-  background: linear-gradient(90deg, #fef08a 0%, #fde047 100%);
-  padding: 10px 14px; border-bottom: 1px solid #eab308;
-  display: flex; justify-content: space-between; align-items: center;
-  flex-wrap: wrap; gap: 8px;
-}
-.BannerTitle { font-size: 15px; font-weight: 800; color: #713f12; white-space: nowrap; }
-.BannerStats { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.StatPill {
-  background: rgba(255,255,255,0.85); padding: 4px 10px;
-  border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap;
+.PausedBadgeBtn:hover {
+  background: #fef3c7;
+  border-color: #f59e0b;
 }
 
-/* BẢNG MA TRẬN: KHÓA CỐ ĐỊNH ĐỘ RỘNG CÁC CỘT PT BẰNG NHAU (table-layout: fixed) */
-.TableScrollBox {
-  width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
+/* KHUNG BẢNG LỊCH NGÀY FULL MÀN HÌNH */
+.MainArea {
+  flex: 1;
+  width: 100%;
+  padding: 10px 12px 20px;
 }
+
+.BoardCard {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #cbd5e1;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.BoardBanner {
+  background: linear-gradient(90deg, #fef08a 0%, #fde047 100%);
+  padding: 10px 14px;
+  border-bottom: 1px solid #eab308;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.BannerTitle {
+  font-size: 15px;
+  font-weight: 800;
+  color: #713f12;
+  white-space: nowrap;
+}
+
+.BannerStats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.StatPill {
+  background: rgba(255, 255, 255, 0.85);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* BẢNG MA TRẬN: KHÓA TỐI THIỂU 148PX MỖI CỘT ĐỂ KHÔNG BAO GIỜ BỊ RỚT CHỮ */
+.TableScrollBox {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .MatrixTable {
   width: 100%;
-  min-width: 1120px;
+  min-width: 1260px;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
 }
-.MatrixTable th, .MatrixTable td {
+
+.MatrixTable th,
+.MatrixTable td {
   border-right: 1px solid #e2e8f0;
   border-bottom: 1px solid #e2e8f0;
-  padding: 6px 6px;
+  padding: 5px 6px;
   vertical-align: middle;
 }
+
 .StickyCol {
-  position: sticky; left: 0; z-index: 10;
-  width: 46px; min-width: 46px; max-width: 46px;
-  text-align: center; font-weight: 800; font-size: 12.5px;
-  background: #f8fafc; border-right: 2px solid #cbd5e1 !important;
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 12px;
+  background: #f8fafc;
+  border-right: 2px solid #cbd5e1 !important;
   white-space: nowrap;
 }
+
 .ThTrainer {
   background: #fef9c3;
   text-align: center;
   padding: 8px 6px !important;
-}
-.TrainerName {
-  font-size: 13.5px; font-weight: 800; color: #0f172a;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  margin-bottom: 5px;
-}
-.TrainerActionRow { display: flex; justify-content: center; gap: 5px; }
-.MiniTagBtn {
-  border: none; border-radius: 5px; padding: 3px 8px;
-  font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  width: 148px;
+  min-width: 148px;
 }
 
-/* THẺ CA TẬP GỌN ĐẸP, CÂN ĐỐI TRONG KHUNG CỘT */
-.SessionCard {
-  display: flex; flex-direction: column; justify-content: center;
-  background: #eff6ff; border: 1px solid #bfdbfe;
-  border-left: 3.5px solid #2563eb;
-  border-radius: 8px; padding: 6px 7px; gap: 4px;
-  cursor: pointer; transition: 0.12s;
-  width: 100%; overflow: hidden;
+.TrainerName {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 5px;
 }
+
+.TrainerActionRow {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.MiniTagBtn {
+  border: none;
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* THẺ CA TẬP THIẾT KẾ 2 TẦNG CHỐNG LỖI CẮT CHỮ TRIỆT ĐỂ */
+.SessionCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #2563eb;
+  border-radius: 8px;
+  padding: 5px 8px;
+  gap: 4px;
+  cursor: pointer;
+  transition: 0.12s;
+  width: 100%;
+  overflow: hidden;
+  text-align: left;
+}
+
 .SessionCard.double-shift {
   background: linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%);
   border: 1px solid #c4b5fd;
   border-left: 4px solid #7c3aed;
-  padding: 6px 7px;
+  padding: 6px 8px;
 }
+
 .SessionCard:hover {
   transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(37, 99, 235, 0.14);
 }
+
 .SessionCard.cancelled {
-  background: #f8fafc; border-color: #cbd5e1; border-left-color: #94a3b8; opacity: 0.68;
-}
-.SessionCard.completed {
-  background: #ecfdf5; border-color: #a7f3d0; border-left-color: #10b981;
-}
-.SessionCard.off {
-  background: #fef3c7; border: 1px dashed #f59e0b; align-items: center; padding: 6px;
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  border-left-color: #94a3b8;
+  opacity: 0.68;
 }
 
-/* Ca đơn: Tên bên trái, Giờ + X bên phải */
-.SingleRowLayout {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 5px; width: 100%;
+.SessionCard.completed {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  border-left-color: #10b981;
 }
-/* Ca đôi: Hàng trên chứa Badge Ca đôi + Giờ + X, hàng dưới xếp dọc tên 2 khách */
-.DoubleTopBar {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 4px; width: 100%;
-  border-bottom: 1px dashed rgba(124, 58, 237, 0.22);
-  padding-bottom: 4px;
+
+.SessionCard.off {
+  background: #fef3c7;
+  border: 1px dashed #f59e0b;
+  align-items: center;
+  padding: 6px;
 }
-.DoubleRightControls {
-  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
-}
-.DoubleNamesStack {
-  display: flex; flex-direction: column; gap: 2px; width: 100%; padding-top: 1px;
-}
-.DoublePersonLine {
-  font-size: 12px; font-weight: 700; color: #2e1065;
-  line-height: 1.25; text-align: left;
-  display: flex; align-items: flex-start; gap: 4px;
-  word-break: keep-all; overflow-wrap: break-word;
-}
-.PersonDot {
-  color: #7c3aed; font-weight: 900; font-size: 11px; line-height: 1.25; flex-shrink: 0;
+
+/* Tầng 1: Tên khách hàng chiếm trọn bề ngang - không bị chèn ép */
+.SessionTopRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
 }
 
 .ClientTitle {
-  font-size: 12.5px; font-weight: 700; color: #1e293b;
-  word-break: keep-all; overflow-wrap: break-word; line-height: 1.25;
-  text-align: left; flex: 1; min-width: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.3;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  flex: 1;
 }
-.DoubleBadge {
-  display: inline-flex; align-items: center; gap: 3px;
-  background: #7c3aed; color: #fff;
-  font-size: 10px; font-weight: 800; padding: 2px 6px;
-  border-radius: 5px; white-space: nowrap; flex-shrink: 0;
-}
-.TimePill {
-  background: #fff; color: #1d4ed8; border: 1px solid #bfdbfe;
-  font-size: 11px; font-weight: 800; padding: 1.5px 5px;
-  border-radius: 5px; white-space: nowrap; flex-shrink: 0;
-}
-.SessionCard.double-shift .TimePill {
-  color: #6d28d9; border-color: #c4b5fd;
-}
-.CancelBtn {
-  border: none; background: rgba(148, 163, 184, 0.18); color: #64748b;
-  width: 19px; height: 19px; border-radius: 5px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10.5px; cursor: pointer; flex-shrink: 0; padding: 0;
-}
-.CancelBtn:hover { background: #fee2e2; color: #e11d48; }
 
-/* DÒNG CHỐT CA CUỐI BẢNG GỌN GÀNG, ĐỒNG ĐỀU */
+/* Tầng 2: Nhãn giờ + Nhãn ca đôi + Nút X */
+.SessionBottomRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  margin-top: 1px;
+}
+
+.TimePill {
+  background: #fff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+.SessionCard.double-shift .TimePill {
+  color: #6d28d9;
+  border-color: #c4b5fd;
+}
+
+.DoubleBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1.5px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.CancelBtn {
+  border: none;
+  background: rgba(148, 163, 184, 0.2);
+  color: #64748b;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+.CancelBtn:hover {
+  background: #fee2e2;
+  color: #e11d48;
+}
+
+.DoubleNamesStack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.DoublePersonLine {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2e1065;
+  line-height: 1.25;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.PersonDot {
+  color: #7c3aed;
+  font-weight: 900;
+  font-size: 11px;
+  line-height: 1.25;
+  flex-shrink: 0;
+}
+
+/* DÒNG CHỐT CA CUỐI BẢNG */
 .FooterRow td {
-  background: #0f172a !important; color: #fff !important;
-  padding: 9px 4px !important; text-align: center; font-weight: 800;
+  background: #0f172a !important;
+  color: #fff !important;
+  padding: 9px 4px !important;
+  text-align: center;
+  font-weight: 800;
   vertical-align: middle;
 }
+
 .FooterCellWrap {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 4px; min-height: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 28px;
 }
+
 .FooterCountBadge {
-  display: inline-block; background: #22c55e; color: #fff;
-  font-size: 13.5px; font-weight: 800; padding: 2px 13px;
-  border-radius: 20px; white-space: nowrap;
+  display: inline-block;
+  background: #22c55e;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 800;
+  padding: 2px 13px;
+  border-radius: 20px;
+  white-space: nowrap;
 }
+
 .FooterDoubleNote {
-  font-size: 10.5px; font-weight: 700;
-  color: #fde047; background: rgba(254, 240, 138, 0.14);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fde047;
+  background: rgba(254, 240, 138, 0.14);
   border: 1px solid rgba(253, 224, 71, 0.35);
-  padding: 1.5px 6px; border-radius: 5px; display: inline-block;
+  padding: 1.5px 6px;
+  border-radius: 5px;
+  display: inline-block;
   white-space: nowrap;
 }
 
 /* CHẾ ĐỘ XEM THẺ PT */
 .TrainerCardsGrid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 12px; padding: 12px; background: #f8fafc;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  padding: 12px;
+  background: #f8fafc;
 }
+
 .PTCard {
-  background: #fff; border-radius: 12px; border: 1px solid #cbd5e1;
-  padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  padding: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
 }
+
 .PTCardHeader {
-  display: flex; justify-content: space-between; align-items: center;
-  border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 10px;
-  flex-wrap: wrap; gap: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 /* TAB 2 & 3: LƯỚI THẺ HIỆN ĐẠI */
 .ClientCardsGrid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px; margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
 }
+
 .ClientItemCard {
-  background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;
-  padding: 14px; display: flex; flex-direction: column; gap: 10px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.02); text-align: left;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+  text-align: left;
 }
+
 .ClientCardTop {
-  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
 }
+
 .StatusBadge {
-  padding: 4px 10px; border-radius: 20px; font-size: 11.5px;
-  font-weight: 700; white-space: nowrap; flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
+
 .ScheduleTag {
-  background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;
-  padding: 4px 9px; border-radius: 6px; font-size: 12px;
-  font-weight: 700; white-space: nowrap;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
+
 .ModifiedTimeBox {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 5px 10px; border-radius: 7px; font-size: 11.5px;
-  font-weight: 600; white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
 }
+
 .ModifiedTimeBox.edited {
-  background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
 }
+
 .ModifiedTimeBox.unchanged {
-  background: #f8fafc; border: 1px dashed #e2e8f0; color: #94a3b8;
+  background: #f8fafc;
+  border: 1px dashed #e2e8f0;
+  color: #94a3b8;
+}
+
+/* ==================== MÀN HÌNH ĐĂNG NHẬP / ĐĂNG KÝ ==================== */
+.AuthBackdrop {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  padding: 16px;
+}
+
+.AuthCard {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 420px;
+  max-width: 95vw;
+  padding: 28px 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+  text-align: center;
+}
+
+.AuthLogo {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  background: #fff;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin-bottom: 12px;
+}
+
+.AuthTitle {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 4px;
+}
+
+.AuthSub {
+  font-size: 12.5px;
+  color: #64748b;
+  margin-bottom: 20px;
+}
+
+.AuthTabs {
+  display: flex;
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.AuthTabBtn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.AuthTabBtn.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.AuthForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.AuthLabel {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.AuthInput {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  outline: none;
+  transition: 0.15s;
+}
+
+.AuthInput:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.AuthSubmitBtn {
+  border: none;
+  border-radius: 8px;
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 800;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: 0.15s;
+}
+.AuthSubmitBtn:hover {
+  background: #1d4ed8;
+}
+
+.AuthErrorBox {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.AuthHint {
+  font-size: 11.5px;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-top: 14px;
+  text-align: left;
 }
 
 @media (max-width: 768px) {
   .ProHeader { padding: 10px 12px; }
-  .BrandText { font-size: 15px !important; }
+  .BrandText { font-size: 14.5px !important; }
   .NavGroup { width: 100%; justify-content: space-between; }
   .NavBtn { flex: 1; text-align: center; padding: 7px 6px; font-size: 12px; }
   .ToolbarCard { margin: 8px 8px 0; padding: 10px; }
