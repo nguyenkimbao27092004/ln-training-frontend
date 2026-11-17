@@ -4,6 +4,7 @@ import axios from 'axios';
 import './App.css';
 import {
   API_URL,
+  DAYS,
   styles,
   isDoubleSession,
   getCleanSessionName,
@@ -26,7 +27,7 @@ import Modals from './Modals';
 export default function App() {
   const weekRange = getCurrentWeekRange();
 
-  // Lưu nhớ trạng thái đăng nhập trong localStorage
+  // Lưu nhớ trạng thái đăng nhập Admin/PT trong localStorage
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('gym_dinhle_user');
@@ -36,8 +37,19 @@ export default function App() {
     }
   });
 
-  // State Form Đăng nhập & Đăng ký
-  const [authMode, setAuthMode] = useState('LOGIN'); // LOGIN | REGISTER
+  // Lưu nhớ trạng thái đăng nhập của KHÁCH HÀNG (Tra cứu bằng SĐT)
+  const [clientPortalData, setClientPortalData] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gym_dinhle_client_portal');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [clientPhoneInput, setClientPhoneInput] = useState('');
+
+  // State Form Đăng nhập & Đăng ký & Khách hàng
+  const [authMode, setAuthMode] = useState('CLIENT'); // CLIENT | LOGIN | REGISTER
   const [authForm, setAuthForm] = useState({ username: '', password: '', name: '', trainerId: '' });
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
@@ -61,7 +73,9 @@ export default function App() {
     updateScope: 'DAILY',
     isDouble: false,
     mergeWithSessionId: '',
-    secondClientName: ''
+    secondClientName: '',
+    workoutType: '',
+    workoutNote: ''
   });
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -73,7 +87,9 @@ export default function App() {
     secondClientId: '',
     secondClientName: '',
     time: '',
-    saveToWeekly: false
+    saveToWeekly: false,
+    workoutType: '',
+    workoutNote: ''
   });
 
   const [filterTrainer, setFilterTrainer] = useState('ALL');
@@ -130,7 +146,7 @@ export default function App() {
     }
   };
 
-  // ==================== XỬ LÝ ĐĂNG NHẬP / ĐĂNG KÝ / ĐĂNG XUẤT ====================
+  // ==================== XỬ LÝ ĐĂNG NHẬP ADMIN / PT / KHÁCH HÀNG ====================
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -145,7 +161,7 @@ export default function App() {
         const user = res.data.user;
         setCurrentUser(user);
         localStorage.setItem('gym_dinhle_user', JSON.stringify(user));
-      } else {
+      } else if (authMode === 'REGISTER') {
         const res = await axios.post(`${API_URL}/auth/register`, {
           username: authForm.username,
           password: authForm.password,
@@ -162,6 +178,32 @@ export default function App() {
     } finally {
       setAuthLoading(false);
     }
+  };
+
+  // Xử lý Form Đăng nhập riêng cho Khách hàng bằng Số điện thoại
+  const handleClientLoginSubmit = async (e) => {
+    if (e) e.preventDefault();
+    setAuthError('');
+    setAuthLoading(true);
+
+    try {
+      const phoneToQuery = clientPhoneInput || clientPortalData?.client?.phone;
+      const res = await axios.post(`${API_URL}/auth/client-login`, {
+        phone: phoneToQuery
+      });
+      setClientPortalData(res.data);
+      localStorage.setItem('gym_dinhle_client_portal', JSON.stringify(res.data));
+    } catch (err) {
+      setAuthError(err.response?.data?.error || 'Không tìm thấy số điện thoại này');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleClientLogout = () => {
+    setClientPortalData(null);
+    setClientPhoneInput('');
+    localStorage.removeItem('gym_dinhle_client_portal');
   };
 
   const handleLogout = () => {
@@ -217,8 +259,8 @@ export default function App() {
     setSessions(res.data);
   };
 
+  // Cho phép cả Admin và PT bấm vào ca tập (Admin sửa mọi thứ, PT ghi bài tập cho khách)
   const openEditModal = (session) => {
-    if (!isAdmin) return alert('Tài khoản Huấn Luyện Viên (PT) chỉ có quyền xem lịch, không được sửa ca!');
     if (session.clientName === 'OFF') return;
     setEditingSession(session);
     setEditForm({
@@ -229,7 +271,9 @@ export default function App() {
       updateScope: 'DAILY',
       isDouble: isDoubleSession(session),
       mergeWithSessionId: '',
-      secondClientName: ''
+      secondClientName: '',
+      workoutType: session.workoutType || '',
+      workoutNote: session.workoutNote || ''
     });
   };
 
@@ -245,7 +289,26 @@ export default function App() {
 
   const handleSaveReschedule = async (e) => {
     e.preventDefault();
-    if (!isAdmin) return alert('Chỉ Admin mới có quyền xếp lại ca!');
+
+    // Nếu là PT: Chỉ lưu thông tin Bài Tập (workoutType & workoutNote)
+    if (!isAdmin) {
+      const res = await axios.put(
+        `${API_URL}/daily-session/${editingSession._id}/workout`,
+        {
+          workoutType: editForm.workoutType,
+          workoutNote: editForm.workoutNote,
+          saveToWeekly: editForm.updateScope === 'WEEKLY'
+        }
+      );
+      setSessions(sessions.map(s => (s._id === editingSession._id ? res.data : s)));
+      if (editForm.updateScope === 'WEEKLY') {
+        await fetchInitData();
+      }
+      setEditingSession(null);
+      return;
+    }
+
+    // Nếu là Admin: Lưu toàn bộ như cũ + Bài Tập
     let baseName = editForm.clientName.trim();
 
     if (editForm.isDouble) {
@@ -272,7 +335,9 @@ export default function App() {
       time: editForm.time,
       clientName: finalClientName,
       status: editForm.status,
-      updateScope: editForm.updateScope
+      updateScope: editForm.updateScope,
+      workoutType: editForm.workoutType,
+      workoutNote: editForm.workoutNote
     };
 
     const res = await axios.put(
@@ -348,7 +413,9 @@ export default function App() {
       secondClientId: '',
       secondClientName: '',
       time: '15h',
-      saveToWeekly: false
+      saveToWeekly: false,
+      workoutType: '',
+      workoutNote: ''
     });
     setShowAddModal(true);
   };
@@ -369,7 +436,9 @@ export default function App() {
       clientId: addForm.clientId || null,
       clientName: finalClientName,
       time: addForm.time,
-      saveToWeekly: addForm.saveToWeekly
+      saveToWeekly: addForm.saveToWeekly,
+      workoutType: addForm.workoutType,
+      workoutNote: addForm.workoutNote
     });
 
     setSessions([...sessions, res.data]);
@@ -396,8 +465,8 @@ export default function App() {
     setSessions(res.data);
   };
 
+  // Cả Admin và PT đều có thể lưu giáo án/bài tập tuần & SĐT của khách
   const handleSaveClientWeekly = async () => {
-    if (!isAdmin) return alert('Chỉ Admin mới có quyền sửa lịch tuần!');
     const payload = {
       ...editingClient,
       packageNote: attachUpdateTimestamp(editingClient.packageNote)
@@ -407,12 +476,11 @@ export default function App() {
     setEditingClient(null);
   };
 
-  // Nút bật toàn bộ khách hàng sang trạng thái OFF (PAUSED) để chuẩn bị xếp lịch tuần mới
   const handlePauseAllClients = async () => {
     if (!isAdmin) return alert('Chỉ Admin mới có quyền chuyển toàn bộ học viên sang OFF!');
     const confirm = window.confirm(
-      'BẠN CÓ CHẮC CHẮN MUỐN CHUYỂN TOÀN BỘ HỌC VIÊN SANG TRẠNG THÁI TẠM NGHỈ (OFF)?\\n\\n' +
-      '• Toàn bộ học viên sẽ chuyển thành PAUSED để bạn kiểm tra ai xác nhận tập lại.\\n' +
+      'BẠN CÓ CHẮC CHẮN MUỐN CHUYỂN TOÀN BỘ HỌC VIÊN SANG TRẠNG THÁI TẠM NGHỈ (OFF)?\n\n' +
+      '• Toàn bộ học viên sẽ chuyển thành PAUSED để bạn kiểm tra ai xác nhận tập lại.\n' +
       '• Khi học viên báo lịch tập mới, bạn chỉ cần sửa lại trạng thái "Đang tập" và điền giờ.'
     );
     if (!confirm) return;
@@ -426,11 +494,10 @@ export default function App() {
     }
   };
 
-  // Nút xóa vĩnh viễn 1 khách hàng trong Modal Cập nhật lịch
   const handleDeleteClient = async (client) => {
     if (!isAdmin) return alert('Chỉ Admin mới có quyền xóa học viên!');
     const confirm = window.confirm(
-      `BẠN CÓ CHẮC CHẮN MUỐN XÓA VĨNH VIỄN KHÁCH HÀNG: "${client.name.toUpperCase()}"?\\n\\n` +
+      `BẠN CÓ CHẮC CHẮN MUỐN XÓA VĨNH VIỄN KHÁCH HÀNG: "${client.name.toUpperCase()}"?\n\n` +
       '• Toàn bộ thông tin và lịch tập cố định tuần của khách này sẽ bị xóa khỏi cơ sở dữ liệu.'
     );
     if (!confirm) return;
@@ -464,9 +531,9 @@ export default function App() {
     if (!isAdmin) return alert('Chỉ Admin mới có quyền xóa dữ liệu tháng!');
     const { start, end, label } = getMonthRange(selectedMonth);
     const confirmMsg =
-      `BẠN CÓ CHẮC CHẮN MUỐN XÓA DỮ LIỆU CHỐT CA CỦA ${label.toUpperCase()}?\\n\\n` +
-      `• Khoảng thời gian xóa: Từ ${start} đến ${end}\\n` +
-      `• Danh sách khách hàng và Lịch Tuần cố định vẫn được GIỮ NGUYÊN 100%.\\n` +
+      `BẠN CÓ CHẮC CHẮN MUỐN XÓA DỮ LIỆU CHỐT CA CỦA ${label.toUpperCase()}?\n\n` +
+      `• Khoảng thời gian xóa: Từ ${start} đến ${end}\n` +
+      `• Danh sách khách hàng và Lịch Tuần cố định vẫn được GIỮ NGUYÊN 100%.\n` +
       `• Hãy chắc chắn bạn đã bấm "Xuất Excel" để lưu báo cáo tháng trước khi xóa!`;
 
     if (!window.confirm(confirmMsg)) return;
@@ -484,7 +551,295 @@ export default function App() {
     }
   };
 
-  // ==================== NẾU CHƯA ĐĂNG NHẬP: HIỆN GIAO DIỆN LOGIN / REGISTER ====================
+  // ==================== GIAO DIỆN DÀNH RIÊNG CHO KHÁCH HÀNG SAU KHI NHẬP SĐT ====================
+  if (!currentUser && clientPortalData) {
+    const { client, trainers: portalTrainers = [], recentSessions = [] } = clientPortalData;
+    const { cleanNote } = parseClientNoteAndTime(client.packageNote, client.updatedAt);
+    const todayStr = getTodayStr();
+    const jsDay = new Date().getDay();
+    const todayDayOfWeek = jsDay === 0 ? 8 : jsDay + 1;
+
+    const getTrainerName = (tId) => {
+      if (!tId) return client.primaryTrainerId?.name || 'PT Gym DinhLe';
+      if (typeof tId === 'object' && tId.name) return tId.name;
+      const found = portalTrainers.find(t => String(t._id) === String(tId));
+      return found ? found.name : (client.primaryTrainerId?.name || 'PT Gym DinhLe');
+    };
+
+    const todaySession = recentSessions.find(s => s.date === todayStr && s.status !== 'CANCELLED');
+    const todayWeeklySlot = client.weeklySchedule?.find(s => s.dayOfWeek === todayDayOfWeek);
+
+    const activeWorkoutTypeToday = todaySession?.workoutType || todayWeeklySlot?.workoutType || '';
+    const activeWorkoutNoteToday = todaySession?.workoutNote || todayWeeklySlot?.workoutNote || '';
+    const activeTimeToday = todaySession?.time || todayWeeklySlot?.time || '';
+    const activeTrainerToday = getTrainerName(todaySession?.trainerId || todayWeeklySlot?.assignedTrainerId);
+
+    return (
+      <div className="app-shell">
+        <header className="ProHeader">
+          <div className="BrandRow">
+            <img
+              src="/logo.png"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = '/logo.jpg';
+              }}
+              alt="Gym DinhLe Logo"
+              className="BrandLogoImg"
+            />
+            <div className="BrandTitleWrap">
+              <h1 className="BrandText">GYM DINHLE — SỔ TAY LỊCH TẬP HỌC VIÊN</h1>
+              <span className="BrandSub">Tra cứu lịch tập tuần & Giáo án cá nhân</span>
+            </div>
+          </div>
+
+          <div className="HeaderRightSide">
+            <div className="UserBadge">
+              <span>👤 {client.name}</span>
+              <span className="RoleTag" style={{ background: '#10b981', color: '#fff' }}>
+                HỌC VIÊN
+              </span>
+              <button
+                onClick={handleClientLoginSubmit}
+                className="LogoutBtn"
+                style={{ marginRight: '4px' }}
+              >
+                🔄 Làm mới
+              </button>
+              <button onClick={handleClientLogout} className="LogoutBtn">
+                🚪 Thoát
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className="MainArea" style={{ maxWidth: '960px', margin: '0 auto' }}>
+          {/* THÔNG TIN CÁ NHÂN CỦA KHÁCH HÀNG */}
+          <div className="ClientPortalHeroCard">
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                Thông tin hội viên
+              </div>
+              <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '4px 0' }}>
+                {client.name}
+              </h2>
+              <div style={{ fontSize: '13.5px', color: '#334155', display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '6px' }}>
+                <span>📱 SĐT: <strong>{client.phone}</strong></span>
+                <span>🏋️ PT Phụ trách: <strong>{client.primaryTrainerId?.name || 'Đang cập nhật'}</strong></span>
+              </div>
+              {cleanNote && (
+                <div style={{ marginTop: '8px', fontSize: '12.5px', color: '#b45309', background: '#fffbeb', padding: '5px 10px', borderRadius: '6px', border: '1px solid #fde68a', display: 'inline-block', fontWeight: 600 }}>
+                  📌 Ghi chú gói tập: {cleanNote}
+                </div>
+              )}
+            </div>
+
+            <span
+              className="StatusBadge"
+              style={{
+                background: client.status === 'ACTIVE' ? '#dcfce7' : '#fef3c7',
+                color: client.status === 'ACTIVE' ? '#166534' : '#92400e',
+                fontSize: '13px',
+                padding: '6px 14px'
+              }}
+            >
+              {client.status === 'ACTIVE' ? '● Đang hoạt động' : '⏸ Đang tạm nghỉ (OFF)'}
+            </span>
+          </div>
+
+          {/* THẺ LỊCH TẬP HÔM NAY CỦA KHÁCH */}
+          <div className="TodayWorkoutBanner">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <span style={{ fontSize: '12px', fontWeight: 800, background: '#1d4ed8', color: '#fff', padding: '3px 8px', borderRadius: '5px' }}>
+                  HÔM NAY — {formatHeaderDate(todayStr).toUpperCase()}
+                </span>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginTop: '8px' }}>
+                  {todaySession || todayWeeklySlot
+                    ? `⏰ Ca tập lúc: ${activeTimeToday || 'Báo sau'} — Cùng PT ${activeTrainerToday}`
+                    : '🌿 Hôm nay bạn không có lịch tập cố định (Ngày nghỉ phục hồi cơ)'}
+                </h3>
+              </div>
+
+              {activeWorkoutTypeToday && (
+                <div className="WorkoutFocusPill">
+                  🎯 Hôm nay tập: <strong>{activeWorkoutTypeToday.toUpperCase()}</strong>
+                </div>
+              )}
+            </div>
+
+            {activeWorkoutNoteToday ? (
+              <div className="WorkoutDetailBox">
+                <strong>📝 Chi tiết các bài tập hôm nay do PT soạn:</strong>
+                <div style={{ whiteSpace: 'pre-line', marginTop: '4px', lineHeight: 1.5 }}>
+                  {activeWorkoutNoteToday}
+                </div>
+              </div>
+            ) : (todaySession || todayWeeklySlot) ? (
+              <div style={{ fontSize: '12.5px', color: '#475569', marginTop: '6px' }}>
+                💡 PT sẽ hướng dẫn chi tiết giáo án trực tiếp tại phòng tập.
+              </div>
+            ) : null}
+          </div>
+
+          {/* LỊCH TẬP CỐ ĐỊNH TRONG TUẦN CỦA KHÁCH */}
+          <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: '18px 0 10px' }}>
+            📅 Lịch Tập Cố Định Trong Tuần Của Bạn
+          </h3>
+
+          <div className="ClientCardsGrid" style={{ marginTop: 0 }}>
+            {DAYS.map(day => {
+              const slot = client.weeklySchedule?.find(s => s.dayOfWeek === day.num);
+              const isToday = day.num === todayDayOfWeek;
+
+              return (
+                <div
+                  key={day.num}
+                  className="ClientItemCard"
+                  style={{
+                    border: isToday ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                    background: slot ? '#ffffff' : '#f8fafc',
+                    opacity: slot ? 1 : 0.75
+                  }}
+                >
+                  <div className="ClientCardTop">
+                    <span style={{ fontSize: '15px', fontWeight: 800, color: isToday ? '#2563eb' : '#0f172a' }}>
+                      {day.label} {isToday && '(Hôm nay)'}
+                    </span>
+                    {slot ? (
+                      <span className="ScheduleTag" style={{ fontSize: '12.5px' }}>
+                        ⏰ {slot.time || 'Báo sau'}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>
+                        Nghỉ ngơi
+                      </span>
+                    )}
+                  </div>
+
+                  {slot ? (
+                    <>
+                      <div style={{ fontSize: '13px', color: '#334155' }}>
+                        👨‍🏫 Huấn luyện viên: <strong>{getTrainerName(slot.assignedTrainerId)}</strong>
+                      </div>
+
+                      <div
+                        style={{
+                          background: slot.workoutType ? '#eff6ff' : '#f1f5f9',
+                          border: slot.workoutType ? '1px solid #bfdbfe' : '1px dashed #cbd5e1',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          marginTop: '4px'
+                        }}
+                      >
+                        <div style={{ fontSize: '13px', fontWeight: 800, color: slot.workoutType ? '#1d4ed8' : '#64748b' }}>
+                          {slot.workoutType
+                            ? `🏋️ Nhóm cơ: ${slot.workoutType}`
+                            : '🏋️ Nhóm cơ: Chưa ghi (Thân trên / Thân dưới)'}
+                        </div>
+
+                        {slot.workoutNote && (
+                          <div
+                            style={{
+                              fontSize: '12.5px',
+                              color: '#1e293b',
+                              marginTop: '6px',
+                              whiteSpace: 'pre-line',
+                              borderTop: '1px solid #dbeafe',
+                              paddingTop: '6px'
+                            }}
+                          >
+                            <strong>Bài tập:</strong> {slot.workoutNote}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: '12.5px', color: '#94a3b8' }}>
+                      Không có ca tập cố định vào ngày này.
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* CÁC BUỔI TẬP GẦN ĐÂY TRÊN LỊCH NGÀY (CÓ GHI CHÚ BÀI TẬP RIÊNG) */}
+          {recentSessions.length > 0 && (
+            <>
+              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: '22px 0 10px' }}>
+                📝 Nhật Ký Các Buổi Tập Theo Ngày Của Bạn
+              </h3>
+              <div className="ClientCardsGrid" style={{ marginTop: 0 }}>
+                {recentSessions.map(s => (
+                  <div key={s._id} className="ClientItemCard">
+                    <div className="ClientCardTop">
+                      <strong style={{ fontSize: '14px', color: '#0f172a' }}>
+                        {formatHeaderDate(s.date)}
+                      </strong>
+                      <span
+                        className="StatusBadge"
+                        style={{
+                          background:
+                            s.status === 'COMPLETED'
+                              ? '#dcfce7'
+                              : s.status === 'CANCELLED'
+                              ? '#fee2e2'
+                              : '#e0f2fe',
+                          color:
+                            s.status === 'COMPLETED'
+                              ? '#166534'
+                              : s.status === 'CANCELLED'
+                              ? '#991b1b'
+                              : '#0369a1'
+                        }}
+                      >
+                        {s.status === 'COMPLETED'
+                          ? '✅ Đã hoàn thành'
+                          : s.status === 'CANCELLED'
+                          ? '✕ Đã nghỉ / Hủy'
+                          : `⏰ Lịch hẹn: ${s.time || 'h'}`}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '12.5px', color: '#475569' }}>
+                      PT hướng dẫn: <strong>{getTrainerName(s.trainerId)}</strong> • Giờ tập: <strong>{s.time || '—'}</strong>
+                    </div>
+
+                    {(s.workoutType || s.workoutNote) && (
+                      <div
+                        style={{
+                          background: '#f0fdf4',
+                          border: '1px solid #bbf7d0',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          fontSize: '12.5px',
+                          color: '#166534'
+                        }}
+                      >
+                        {s.workoutType && (
+                          <div style={{ fontWeight: 800, marginBottom: s.workoutNote ? '4px' : 0 }}>
+                            🎯 Tập: {s.workoutType}
+                          </div>
+                        )}
+                        {s.workoutNote && (
+                          <div style={{ whiteSpace: 'pre-line', color: '#1e293b' }}>
+                            {s.workoutNote}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ==================== NẾU CHƯA ĐĂNG NHẬP: HIỆN FORM RIÊNG CHO KHÁCH HÀNG & ADMIN/PT ====================
   if (!currentUser) {
     return (
       <div className="AuthBackdrop">
@@ -495,10 +850,16 @@ export default function App() {
 
           <div className="AuthTabs">
             <button
+              onClick={() => { setAuthMode('CLIENT'); setAuthError(''); }}
+              className={`AuthTabBtn ${authMode === 'CLIENT' ? 'active' : ''}`}
+            >
+              🏋️ Khách Hàng
+            </button>
+            <button
               onClick={() => { setAuthMode('LOGIN'); setAuthError(''); }}
               className={`AuthTabBtn ${authMode === 'LOGIN' ? 'active' : ''}`}
             >
-              🔐 Đăng Nhập
+              🔐 Admin / PT
             </button>
             <button
               onClick={() => { setAuthMode('REGISTER'); setAuthError(''); }}
@@ -510,63 +871,108 @@ export default function App() {
 
           {authError && <div className="AuthErrorBox">⚠️ {authError}</div>}
 
-          <form onSubmit={handleAuthSubmit} className="AuthForm">
-            {authMode === 'REGISTER' && (
+          {/* FORM RIÊNG DÀNH CHO KHÁCH HÀNG TRA CỨU BẰNG SỐ ĐIỆN THOẠI */}
+          {authMode === 'CLIENT' ? (
+            <form onSubmit={handleClientLoginSubmit} className="AuthForm">
+              <div
+                style={{
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '10px',
+                  padding: '10px 12px',
+                  fontSize: '12.5px',
+                  color: '#1e3a8a',
+                  lineHeight: 1.4
+                }}
+              >
+                👋 <strong>Dành cho Học Viên Gym DinhLe:</strong> Chỉ cần nhập <strong>Số điện thoại</strong> của bạn để xem lịch tập trong tuần và hôm nay tập <strong>Thân trên hay Thân dưới</strong>.
+              </div>
+
               <label className="AuthLabel">
-                <span>Họ và Tên Huấn Luyện Viên:</span>
+                <span>📱 Số điện thoại của bạn:</span>
+                <input
+                  type="tel"
+                  required
+                  placeholder="Nhập SĐT (VD: 0909123456)"
+                  value={clientPhoneInput}
+                  onChange={e => setClientPhoneInput(e.target.value)}
+                  className="AuthInput"
+                  style={{ fontSize: '15px', fontWeight: 700 }}
+                />
+              </label>
+
+              <button type="submit" disabled={authLoading} className="AuthSubmitBtn">
+                {authLoading ? 'Đang tìm thông tin...' : '🔍 Xem Lịch Tập & Giáo Án Của Tôi'}
+              </button>
+            </form>
+          ) : (
+            /* FORM ĐĂNG NHẬP / ĐĂNG KÝ CHO ADMIN & PT */
+            <form onSubmit={handleAuthSubmit} className="AuthForm">
+              {authMode === 'REGISTER' && (
+                <label className="AuthLabel">
+                  <span>Họ và Tên Huấn Luyện Viên:</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="VD: Nguyễn Văn A (PT)"
+                    value={authForm.name}
+                    onChange={e => setAuthForm({ ...authForm, name: e.target.value })}
+                    className="AuthInput"
+                  />
+                </label>
+              )}
+
+              <label className="AuthLabel">
+                <span>Tên đăng nhập:</span>
                 <input
                   type="text"
                   required
-                  placeholder="VD: Nguyễn Văn A (PT)"
-                  value={authForm.name}
-                  onChange={e => setAuthForm({ ...authForm, name: e.target.value })}
+                  placeholder={authMode === 'LOGIN' ? 'Tài khoản admin hoặc PT' : 'Tên tài khoản (viết liền)'}
+                  value={authForm.username}
+                  onChange={e => setAuthForm({ ...authForm, username: e.target.value })}
                   className="AuthInput"
                 />
               </label>
-            )}
 
-            <label className="AuthLabel">
-              <span>Tên đăng nhập:</span>
-              <input
-                type="text"
-                required
-                placeholder={authMode === 'LOGIN' ? 'Tài khoản admin hoặc PT' : 'Tên tài khoản (viết liền)'}
-                value={authForm.username}
-                onChange={e => setAuthForm({ ...authForm, username: e.target.value })}
-                className="AuthInput"
-              />
-            </label>
+              <label className="AuthLabel">
+                <span>Mật khẩu:</span>
+                <input
+                  type="password"
+                  required
+                  placeholder="Nhập mật khẩu"
+                  value={authForm.password}
+                  onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+                  className="AuthInput"
+                />
+              </label>
 
-            <label className="AuthLabel">
-              <span>Mật khẩu:</span>
-              <input
-                type="password"
-                required
-                placeholder="Nhập mật khẩu"
-                value={authForm.password}
-                onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
-                className="AuthInput"
-              />
-            </label>
-
-            <button type="submit" disabled={authLoading} className="AuthSubmitBtn">
-              {authLoading
-                ? 'Đang xử lý...'
-                : authMode === 'LOGIN'
-                ? 'Đăng Nhập Vào Hệ Thống'
-                : 'Tạo Tài Khoản Huấn Luyện Viên'}
-            </button>
-          </form>
+              <button type="submit" disabled={authLoading} className="AuthSubmitBtn">
+                {authLoading
+                  ? 'Đang xử lý...'
+                  : authMode === 'LOGIN'
+                  ? 'Đăng Nhập Quản Lý (Admin / PT)'
+                  : 'Tạo Tài Khoản Huấn Luyện Viên'}
+              </button>
+            </form>
+          )}
 
           <div className="AuthHint">
-            👥 <strong>Tài khoản PT:</strong> Có thể bấm qua mục <em>"Đăng Ký PT"</em> để tạo tài khoản xem lịch.
+            {authMode === 'CLIENT' ? (
+              <span>
+                💡 Nếu chưa cập nhật SĐT, bạn hãy nhắn <strong>Admin hoặc PT</strong> thêm SĐT vào hồ sơ của bạn nhé!
+              </span>
+            ) : (
+              <span>
+                👥 <strong>Tài khoản PT:</strong> Có thể bấm vào từng ca tập hoặc lịch tuần để ghi bài tập (Thân trên / Thân dưới) cho học viên.
+              </span>
+            )}
           </div>
         </div>
       </div>
     );
   }
 
-  // ==================== ĐÃ ĐĂNG NHẬP: GIAO DIỆN CHÍNH ====================
+  // ==================== ĐÃ ĐĂNG NHẬP ADMIN / PT: GIAO DIỆN CHÍNH ====================
   const isDayLocked = sessions.some(s => s.isLocked);
   const validDaySessions = sessions.filter(s => s.status !== 'CANCELLED');
   const totalValidShifts = validDaySessions.length;
@@ -577,10 +983,17 @@ export default function App() {
 
   const pausedClientsCount = clients.filter(c => c.status === 'PAUSED').length;
 
+  // Tìm kiếm khách hàng bằng cả TÊN hoặc SỐ ĐIỆN THOẠI
   const displayedClients = clients
     .filter(c => filterTrainer === 'ALL' || (c.primaryTrainerId?._id || c.primaryTrainerId) === filterTrainer)
     .filter(c => filterStatus === 'ALL' || c.status === filterStatus)
-    .filter(c => c.name.toLowerCase().includes(searchClient.toLowerCase()))
+    .filter(c => {
+      const q = searchClient.toLowerCase().trim();
+      if (!q) return true;
+      const matchName = c.name.toLowerCase().includes(q);
+      const matchPhone = (c.phone || '').toLowerCase().includes(q);
+      return matchName || matchPhone;
+    })
     .sort((a, b) => {
       if (sortClientMode !== 'RECENT') return 0;
       const timeA = parseClientNoteAndTime(a.packageNote, a.updatedAt).updatedAt;
@@ -762,7 +1175,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* CHẾ ĐỘ 1: BẢNG MA TRẬN CHỐNG CẮT CHỮ TRIỆT ĐỂ */}
+              {/* CHẾ ĐỘ 1: BẢNG MA TRẬN */}
               {dailyLayout === 'BOARD' ? (
                 <div className="TableScrollBox">
                   <table className="MatrixTable">
@@ -800,7 +1213,7 @@ export default function App() {
                                   </>
                                 ) : (
                                   <span style={{ fontSize: '11px', color: isOff ? '#b45309' : '#166534', fontWeight: 700 }}>
-                                    {isOff ? 'OFF' : 'Hoạt động'}
+                                    {isOff ? 'OFF' : 'Bấm vào ca để ghi bài tập'}
                                   </span>
                                 )}
                               </div>
@@ -843,13 +1256,13 @@ export default function App() {
                                     } ${isCancelled ? 'cancelled' : ''} ${
                                       isCompleted ? 'completed' : ''
                                     }`}
+                                    title={cellSession.workoutNote ? `Bài tập: ${cellSession.workoutNote}` : 'Bấm để xếp ca / ghi bài tập'}
                                   >
                                     {isOffMarker ? (
                                       <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#b45309', whiteSpace: 'nowrap' }}>
                                         NGHỈ PHÉP (OFF)
                                       </span>
                                     ) : isDouble ? (
-                                      /* CA ĐÔI: HIỂN THỊ TÊN 2 KHÁCH XẾP DÒNG DỌC KHÔNG CẮT CHỮ */
                                       <>
                                         <div
                                           className="DoubleNamesStack"
@@ -864,6 +1277,12 @@ export default function App() {
                                             </div>
                                           ))}
                                         </div>
+
+                                        {(cellSession.workoutType || cellSession.workoutNote) && (
+                                          <div className="MiniWorkoutBadge">
+                                            🏋️ {cellSession.workoutType || 'Có bài tập'}
+                                          </div>
+                                        )}
 
                                         <div className="SessionBottomRow">
                                           <span className="DoubleBadge">👥 Ca đôi</span>
@@ -882,7 +1301,6 @@ export default function App() {
                                         </div>
                                       </>
                                     ) : (
-                                      /* CA ĐƠN: TÊN ĐƯỢC ƯU TIÊN TRÊN CÙNG CHIẾM 100% CHIỀU RỘNG */
                                       <>
                                         <div className="SessionTopRow">
                                           <span
@@ -894,6 +1312,12 @@ export default function App() {
                                             {getCleanSessionName(cellSession.clientName)}
                                           </span>
                                         </div>
+
+                                        {(cellSession.workoutType || cellSession.workoutNote) && (
+                                          <div className="MiniWorkoutBadge">
+                                            🏋️ {cellSession.workoutType || 'Có bài tập'}
+                                          </div>
+                                        )}
 
                                         <div className="SessionBottomRow">
                                           <span className="TimePill">
@@ -1039,33 +1463,41 @@ export default function App() {
                                       NGHỈ PHÉP (OFF)
                                     </span>
                                   ) : (
-                                    <div className="SingleRowLayout">
-                                      <span
-                                        className="ClientTitle"
-                                        style={{
-                                          textDecoration: isCancelled ? 'line-through' : 'none'
-                                        }}
-                                      >
-                                        #{idx + 1}.{' '}
-                                        {isDouble && (
-                                          <span className="DoubleBadge" style={{ marginRight: '5px' }}>
-                                            👥 Ca đôi
-                                          </span>
-                                        )}
-                                        {getCleanSessionName(cellSession.clientName)}
-                                      </span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span
+                                          className="ClientTitle"
+                                          style={{
+                                            textDecoration: isCancelled ? 'line-through' : 'none'
+                                          }}
+                                        >
+                                          #{idx + 1}.{' '}
+                                          {isDouble && (
+                                            <span className="DoubleBadge" style={{ marginRight: '5px' }}>
+                                              👥 Ca đôi
+                                            </span>
+                                          )}
+                                          {getCleanSessionName(cellSession.clientName)}
+                                        </span>
 
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <span className="TimePill">{cellSession.time || 'h'}</span>
-                                        {isAdmin && !cellSession.isLocked && (
-                                          <button
-                                            onClick={e => handleQuickToggleCancel(cellSession, e)}
-                                            className="CancelBtn"
-                                          >
-                                            {isCancelled ? '↺' : '✕'}
-                                          </button>
-                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                          <span className="TimePill">{cellSession.time || 'h'}</span>
+                                          {isAdmin && !cellSession.isLocked && (
+                                            <button
+                                              onClick={e => handleQuickToggleCancel(cellSession, e)}
+                                              className="CancelBtn"
+                                            >
+                                              {isCancelled ? '↺' : '✕'}
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
+
+                                      {(cellSession.workoutType || cellSession.workoutNote) && (
+                                        <div className="MiniWorkoutBadge">
+                                          🏋️ {cellSession.workoutType || 'Bài tập'}{cellSession.workoutNote ? `: ${cellSession.workoutNote}` : ''}
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -1083,7 +1515,7 @@ export default function App() {
         </>
       )}
 
-      {/* ==================== TAB 2: QUẢN LÝ LỊCH TUẦN & NÚT BẬT TOÀN BỘ KHÁCH OFF ==================== */}
+      {/* ==================== TAB 2: QUẢN LÝ LỊCH TUẦN, SĐT & GHI BÀI TẬP ==================== */}
       {activeTab === 'CLIENTS' && (
         <div className="MainArea">
           <div className="ToolbarCard" style={{ margin: '0 0 12px 0' }}>
@@ -1120,16 +1552,15 @@ export default function App() {
 
               <input
                 type="text"
-                placeholder="🔍 Tìm tên khách hàng..."
+                placeholder="🔍 Tìm tên hoặc số điện thoại khách hàng..."
                 value={searchClient}
                 onChange={e => setSearchClient(e.target.value)}
-                style={{ ...styles.input, flex: 1, minWidth: '160px' }}
+                style={{ ...styles.input, flex: 1, minWidth: '200px' }}
               />
             </div>
 
             {isAdmin && (
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {/* Nút bật toàn bộ khách hàng sang trạng thái OFF */}
                 <button
                   onClick={handlePauseAllClients}
                   className="Btn BtnOrange"
@@ -1142,6 +1573,7 @@ export default function App() {
                   onClick={() =>
                     setEditingClient({
                       name: '',
+                      phone: '',
                       primaryTrainerId: trainers[0]?._id || '',
                       status: 'ACTIVE',
                       packageNote: '',
@@ -1171,6 +1603,9 @@ export default function App() {
                       <div style={{ fontSize: '15.5px', fontWeight: 800, color: '#0f172a' }}>
                         {client.name}
                       </div>
+                      <div style={{ fontSize: '12.5px', color: '#0369a1', fontWeight: 700, marginTop: '2px' }}>
+                        📱 SĐT: {client.phone ? client.phone : <span style={{ color: '#94a3b8', fontWeight: 500 }}>Chưa cập nhật</span>}
+                      </div>
                       <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
                         PT Quản lý: <strong style={{ color: '#1e293b' }}>{client.primaryTrainerId?.name || '—'}</strong>
                       </div>
@@ -1193,6 +1628,7 @@ export default function App() {
                       .map((slot, idx) => (
                         <span key={idx} className="ScheduleTag">
                           T{slot.dayOfWeek}: {slot.time || 'Báo sau'}
+                          {slot.workoutType ? ` • ${slot.workoutType}` : ''}
                         </span>
                       ))}
                   </div>
@@ -1229,6 +1665,7 @@ export default function App() {
                       onClick={() =>
                         setEditingClient({
                           ...client,
+                          phone: client.phone || '',
                           packageNote: cleanNote,
                           lastModifiedDisplay: formattedTime,
                           primaryTrainerId: client.primaryTrainerId?._id || client.primaryTrainerId
@@ -1237,7 +1674,7 @@ export default function App() {
                       className="Btn BtnLight"
                       style={{ width: '100%' }}
                     >
-                      {isAdmin ? '✏️ Chỉnh Sửa / Xóa Khách' : '👁️ Xem Chi Tiết Lịch'}
+                      {isAdmin ? '✏️ Sửa Lịch / SĐT / Ghi Bài Tập' : '🏋️ Ghi Bài Tập & SĐT Khách'}
                     </button>
                   </div>
                 </div>

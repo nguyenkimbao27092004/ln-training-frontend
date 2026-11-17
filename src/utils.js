@@ -13,6 +13,17 @@ export const DAYS = [
   { num: 8, label: 'Chủ Nhật' }
 ];
 
+export const WORKOUT_TYPES = [
+  { value: '', label: '-- Chọn buổi tập (Thân trên / Thân dưới...) --' },
+  { value: 'Thân trên', label: '💪 Tập Thân Trên (Upper Body)' },
+  { value: 'Thân dưới', label: '🦵 Tập Thân Dưới (Lower Body)' },
+  { value: 'Full Body', label: '🔥 Tập Toàn Thân (Full Body)' },
+  { value: 'Ngực - Vai - Tay sau', label: '🛡️ Push (Ngực - Vai - Tay sau)' },
+  { value: 'Lưng - Tay trước', label: '🦅 Pull (Lưng - Xô - Tay trước)' },
+  { value: 'Mông - Đùi', label: '🍑 Mông - Đùi (Glutes & Legs)' },
+  { value: 'Cardio - Core', label: '🫀 Cardio / Bụng / Thể lực' }
+];
+
 export const UPD_MARKER = '@@UPD:';
 export const DOUBLE_MARKER = '[CA ĐÔI]';
 
