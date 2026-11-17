@@ -891,7 +891,7 @@ export default function App() {
                   lineHeight: 1.4
                 }}
               >
-                👋 <strong>Dành cho Học Viên Gym DinhLe:</strong> Chỉ cần nhập <strong>Số điện thoại (hoặc 4 số cuối)</strong> của bạn để xem lịch tập trong tuần và hôm nay tập <strong>Thân trên hay Thân dưới</strong>.
+                👋 <strong>Dành cho Học Viên Gym DinhLe:</strong> Chỉ cần nhập <strong>số điện thoại (hoặc 4 số cuối)</strong> của bạn để xem lịch tập trong tuần <strong></strong>.
               </div>
 
               <label className="AuthLabel">
@@ -899,7 +899,7 @@ export default function App() {
                 <input
                   type="tel"
                   required
-                  placeholder="Nhập SĐT hoặc 4 số cuối (VD: 0909123456 hoặc 3456)"
+                  placeholder="Nhập SĐT hoặc 4 số cuối"
                   value={clientPhoneInput}
                   onChange={e => setClientPhoneInput(e.target.value)}
                   className="AuthInput"
