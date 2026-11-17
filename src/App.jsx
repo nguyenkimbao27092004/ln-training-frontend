@@ -915,31 +915,17 @@ export default function App() {
             /* FORM ĐĂNG NHẬP / ĐĂNG KÝ CHO ADMIN & PT */
             <form onSubmit={handleAuthSubmit} className="AuthForm">
               {authMode === 'REGISTER' && (
-                <>
-                  <label className="AuthLabel">
-                    <span>Họ và Tên Huấn Luyện Viên:</span>
-                    <input
-                      type="text"
-                      required
-                      placeholder="VD: Nguyễn Văn A (PT)"
-                      value={authForm.name}
-                      onChange={e => setAuthForm({ ...authForm, name: e.target.value })}
-                      className="AuthInput"
-                    />
-                  </label>
-
-                  <label className="AuthLabel">
-                    <span>Mã xác nhận đăng ký PT:</span>
-                    <input
-                      type="password"
-                      required
-                      placeholder="Nhập mã xác nhận do Admin cấp"
-                      value={authForm.registerCode}
-                      onChange={e => setAuthForm({ ...authForm, registerCode: e.target.value })}
-                      className="AuthInput"
-                    />
-                  </label>
-                </>
+                <label className="AuthLabel">
+                  <span>Họ và Tên Huấn Luyện Viên:</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="VD: Nguyễn Văn A (PT)"
+                    value={authForm.name}
+                    onChange={e => setAuthForm({ ...authForm, name: e.target.value })}
+                    className="AuthInput"
+                  />
+                </label>
               )}
 
               <label className="AuthLabel">
@@ -965,6 +951,20 @@ export default function App() {
                   className="AuthInput"
                 />
               </label>
+
+              {authMode === 'REGISTER' && (
+                <label className="AuthLabel">
+                  <span>Mã xác nhận đăng ký PT:</span>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Nhập mã xác nhận"
+                    value={authForm.registerCode}
+                    onChange={e => setAuthForm({ ...authForm, registerCode: e.target.value })}
+                    className="AuthInput"
+                  />
+                </label>
+              )}
 
               <button type="submit" disabled={authLoading} className="AuthSubmitBtn">
                 {authLoading
