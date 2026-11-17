@@ -580,6 +580,9 @@ export default function App() {
     const activeTimeToday = todaySession?.time || todayWeeklySlot?.time || '';
     const activeTrainerToday = getTrainerName(todaySession?.trainerId || todayWeeklySlot?.assignedTrainerId);
 
+    // Lọc chỉ lấy những ca tập đã hoàn thành (COMPLETED) để hiển thị ở phần Nhật ký của khách hàng
+    const completedSessions = recentSessions.filter(s => s.status === 'COMPLETED');
+
     return (
       <div className="app-shell">
         <header className="ProHeader">
@@ -770,14 +773,14 @@ export default function App() {
             })}
           </div>
 
-          {/* CÁC BUỔI TẬP GẦN ĐÂY TRÊN LỊCH NGÀY (CÓ GHI CHÚ BÀI TẬP RIÊNG) */}
-          {recentSessions.length > 0 && (
+          {/* CÁC BUỔI TẬP GẦN ĐÂY TRÊN LỊCH NGÀY (CHỈ HIỂN THỊ NHỮNG CA ĐÃ HOÀN THÀNH) */}
+          {completedSessions.length > 0 && (
             <>
               <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: '22px 0 10px' }}>
                 📝 Nhật Ký Các Buổi Tập Theo Ngày Của Bạn
               </h3>
               <div className="ClientCardsGrid" style={{ marginTop: 0 }}>
-                {recentSessions.map(s => (
+                {completedSessions.map(s => (
                   <div key={s._id} className="ClientItemCard">
                     <div className="ClientCardTop">
                       <strong style={{ fontSize: '14px', color: '#0f172a' }}>
