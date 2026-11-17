@@ -50,7 +50,7 @@ export default function App() {
 
   // State Form Đăng nhập & Đăng ký & Khách hàng
   const [authMode, setAuthMode] = useState('CLIENT'); // CLIENT | LOGIN | REGISTER
-  const [authForm, setAuthForm] = useState({ username: '', password: '', name: '', trainerId: '' });
+  const [authForm, setAuthForm] = useState({ username: '', password: '', name: '', trainerId: '', registerCode: '' });
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
@@ -162,11 +162,17 @@ export default function App() {
         setCurrentUser(user);
         localStorage.setItem('gym_dinhle_user', JSON.stringify(user));
       } else if (authMode === 'REGISTER') {
+        if (authForm.registerCode.trim().toLowerCase() !== 'dinhle') {
+          setAuthError('Mã xác nhận đăng ký PT không chính xác!');
+          setAuthLoading(false);
+          return;
+        }
         const res = await axios.post(`${API_URL}/auth/register`, {
           username: authForm.username,
           password: authForm.password,
           name: authForm.name,
-          trainerId: authForm.trainerId || null
+          trainerId: authForm.trainerId || null,
+          registerCode: authForm.registerCode.trim()
         });
         const user = res.data.user;
         alert('Đăng ký tài khoản PT thành công! Bạn có thể xem lịch ngay.');
@@ -180,7 +186,7 @@ export default function App() {
     }
   };
 
-  // Xử lý Form Đăng nhập riêng cho Khách hàng bằng Số điện thoại
+  // Xử lý Form Đăng nhập riêng cho Khách hàng bằng Số điện thoại (hoặc 4 số cuối)
   const handleClientLoginSubmit = async (e) => {
     if (e) e.preventDefault();
     setAuthError('');
@@ -210,7 +216,7 @@ export default function App() {
     if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
       setCurrentUser(null);
       localStorage.removeItem('gym_dinhle_user');
-      setAuthForm({ username: '', password: '', name: '', trainerId: '' });
+      setAuthForm({ username: '', password: '', name: '', trainerId: '', registerCode: '' });
       setAuthError('');
     }
   };
@@ -885,7 +891,7 @@ export default function App() {
                   lineHeight: 1.4
                 }}
               >
-                👋 <strong>Dành cho Học Viên Gym DinhLe:</strong> Chỉ cần nhập <strong>Số điện thoại</strong> của bạn để xem lịch tập trong tuần và hôm nay tập <strong>Thân trên hay Thân dưới</strong>.
+                👋 <strong>Dành cho Học Viên Gym DinhLe:</strong> Chỉ cần nhập <strong>Số điện thoại (hoặc 4 số cuối)</strong> của bạn để xem lịch tập trong tuần và hôm nay tập <strong>Thân trên hay Thân dưới</strong>.
               </div>
 
               <label className="AuthLabel">
@@ -893,7 +899,7 @@ export default function App() {
                 <input
                   type="tel"
                   required
-                  placeholder="Nhập SĐT (VD: 0909123456)"
+                  placeholder="Nhập SĐT hoặc 4 số cuối (VD: 0909123456 hoặc 3456)"
                   value={clientPhoneInput}
                   onChange={e => setClientPhoneInput(e.target.value)}
                   className="AuthInput"
@@ -909,17 +915,31 @@ export default function App() {
             /* FORM ĐĂNG NHẬP / ĐĂNG KÝ CHO ADMIN & PT */
             <form onSubmit={handleAuthSubmit} className="AuthForm">
               {authMode === 'REGISTER' && (
-                <label className="AuthLabel">
-                  <span>Họ và Tên Huấn Luyện Viên:</span>
-                  <input
-                    type="text"
-                    required
-                    placeholder="VD: Nguyễn Văn A (PT)"
-                    value={authForm.name}
-                    onChange={e => setAuthForm({ ...authForm, name: e.target.value })}
-                    className="AuthInput"
-                  />
-                </label>
+                <>
+                  <label className="AuthLabel">
+                    <span>Họ và Tên Huấn Luyện Viên:</span>
+                    <input
+                      type="text"
+                      required
+                      placeholder="VD: Nguyễn Văn A (PT)"
+                      value={authForm.name}
+                      onChange={e => setAuthForm({ ...authForm, name: e.target.value })}
+                      className="AuthInput"
+                    />
+                  </label>
+
+                  <label className="AuthLabel">
+                    <span>Mã xác nhận đăng ký PT:</span>
+                    <input
+                      type="password"
+                      required
+                      placeholder="Nhập mã xác nhận do Admin cấp"
+                      value={authForm.registerCode}
+                      onChange={e => setAuthForm({ ...authForm, registerCode: e.target.value })}
+                      className="AuthInput"
+                    />
+                  </label>
+                </>
               )}
 
               <label className="AuthLabel">
@@ -983,15 +1003,18 @@ export default function App() {
 
   const pausedClientsCount = clients.filter(c => c.status === 'PAUSED').length;
 
-  // Tìm kiếm khách hàng bằng cả TÊN hoặc SỐ ĐIỆN THOẠI
+  // Tìm kiếm khách hàng bằng cả TÊN, SỐ ĐIỆN THOẠI hoặc 4 SỐ CUỐI
   const displayedClients = clients
     .filter(c => filterTrainer === 'ALL' || (c.primaryTrainerId?._id || c.primaryTrainerId) === filterTrainer)
     .filter(c => filterStatus === 'ALL' || c.status === filterStatus)
     .filter(c => {
       const q = searchClient.toLowerCase().trim();
       if (!q) return true;
+      const qDigits = q.replace(/\D/g, '');
+      const rawPhone = (c.phone || '').toLowerCase();
+      const phoneDigits = rawPhone.replace(/\D/g, '');
       const matchName = c.name.toLowerCase().includes(q);
-      const matchPhone = (c.phone || '').toLowerCase().includes(q);
+      const matchPhone = rawPhone.includes(q) || (qDigits.length > 0 && phoneDigits.includes(qDigits));
       return matchName || matchPhone;
     })
     .sort((a, b) => {
@@ -1552,7 +1575,7 @@ export default function App() {
 
               <input
                 type="text"
-                placeholder="🔍 Tìm tên hoặc số điện thoại khách hàng..."
+                placeholder="🔍 Tìm tên, SĐT hoặc 4 số cuối khách hàng..."
                 value={searchClient}
                 onChange={e => setSearchClient(e.target.value)}
                 style={{ ...styles.input, flex: 1, minWidth: '200px' }}
