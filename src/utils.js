@@ -205,12 +205,17 @@ export function exportWeeklySummaryExcel({ startDate, endDate, trainers, weeklyS
   ];
 
   trainers.forEach(trainer => {
-    const item = weeklySummary.find(w => w._id === trainer._id);
+    const item = weeklySummary.find(w => String(w._id) === String(trainer._id));
+    const sortedBreakdown = [...(item?.dailyBreakdown || [])].sort((a, b) =>
+      (a.date || '').localeCompare(b.date || '')
+    );
     const detailStr =
-      item?.dailyBreakdown
-        ?.map(d => {
+      sortedBreakdown
+        .map(d => {
+          const [, mm, dd] = (d.date || '').split('-');
+          const dateLabel = dd && mm ? `${dd}/${mm}` : d.date;
           const dbl = d.doubleCount ? ` (có ${d.doubleCount} ca đôi)` : '';
-          return `${d.date.slice(5)}: ${d.count} ca${dbl}`;
+          return `${dateLabel}: ${d.count} ca${dbl}`;
         })
         .join(', ') || 'Chưa có ca chốt';
     const totalDouble = item?.totalDoubleShifts || 0;

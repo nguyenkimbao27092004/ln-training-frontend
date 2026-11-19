@@ -103,7 +103,7 @@ export default function App() {
   const [startDate, setStartDate] = useState(weekRange.start);
   const [endDate, setEndDate] = useState(weekRange.end);
   const [weeklySummary, setWeeklySummary] = useState([]);
-
+  const [summaryViewMode, setSummaryViewMode] = useState('CARDS'); // CARDS | TABLE
   const isAdmin = currentUser?.role === 'ADMIN';
 
   useEffect(() => {
@@ -1031,6 +1031,41 @@ export default function App() {
 
   const currentMonthInfo = getMonthRange(selectedMonth);
 
+  const formatShortDate = (dateStr) => {
+    if (!dateStr || !dateStr.includes('-')) return dateStr || '';
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const jsDay = new Date(y, m - 1, d).getDay();
+    const dayLabel = jsDay === 0 ? 'CN' : `T${jsDay + 1}`;
+    return `${dayLabel}, ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
+  };
+
+  const formatVNDate = (dateStr) => {
+    if (!dateStr || !dateStr.includes('-')) return dateStr || '';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
+  const summaryByTrainer = trainers.map(trainer => {
+    const item = weeklySummary.find(w => String(w._id) === String(trainer._id));
+    const sortedDays = [...(item?.dailyBreakdown || [])].sort((a, b) =>
+      (a.date || '').localeCompare(b.date || '')
+    );
+    return {
+      trainer,
+      totalShifts: item ? item.totalShifts : 0,
+      totalDoubleShifts: item?.totalDoubleShifts || 0,
+      dailyBreakdown: sortedDays
+    };
+  });
+
+  const grandTotalShifts = summaryByTrainer.reduce((sum, x) => sum + x.totalShifts, 0);
+  const grandTotalDouble = summaryByTrainer.reduce((sum, x) => sum + x.totalDoubleShifts, 0);
+  const activeTrainerCount = summaryByTrainer.filter(x => x.totalShifts > 0).length;
+  const maxTrainerShifts = Math.max(1, ...summaryByTrainer.map(x => x.totalShifts));
+  const allClosedDatesSorted = Array.from(
+    new Set(summaryByTrainer.flatMap(x => x.dailyBreakdown.map(d => d.date)))
+  ).sort((a, b) => a.localeCompare(b));
+
   return (
     <div className="app-shell">
       {/* HEADER GYM DINHLE */}
@@ -1710,102 +1745,263 @@ export default function App() {
         </div>
       )}
 
-      {/* ==================== TAB 3: TỔNG HỢP & DỌN DẸP THEO THÁNG ==================== */}
+{/* ==================== TAB 3: TỔNG HỢP & DỌN DẸP THEO THÁNG ==================== */}
       {activeTab === 'SUMMARY' && (
         <div className="MainArea">
-          <div
-            className="ToolbarCard"
-            style={{
-              margin: '0 0 12px 0',
-              background: '#f8fafc',
-              border: '1px solid #cbd5e1'
-            }}
-          >
-            <div className="ToolSection">
-              <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>
-                🗓 Quản lý theo Tháng:
-              </span>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={e => handleSelectFullMonth(e.target.value)}
-                style={{ ...styles.input, fontWeight: 700 }}
-              />
-              <button
-                onClick={() => handleSelectFullMonth(selectedMonth)}
-                className="Btn BtnDark"
-              >
-                📅 Xem Cả {currentMonthInfo.label}
-              </button>
-            </div>
-
-            <div className="ToolSection">
-              <button onClick={exportWeeklyToExcel} className="Btn BtnEmerald">
-                📥 Xuất Excel ({startDate.slice(5)} → {endDate.slice(5)})
-              </button>
-
-              {isAdmin && (
-                <button onClick={handleDeleteMonthSessions} className="Btn BtnRed">
-                  🗑 Xóa Chốt Ca {currentMonthInfo.label}
+          {/* KHUNG ĐIỀU KHIỂN GỘP GỌN: LỌC THÁNG / KHOẢNG NGÀY / XUẤT EXCEL / DỌN DỮ LIỆU */}
+          <div className="SummaryControlPanel">
+            <div className="SummaryControlRow">
+              <div className="SummaryFilterGroup">
+                <span className="SummaryFilterLabel">🗓 Tháng:</span>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={e => handleSelectFullMonth(e.target.value)}
+                  style={{ ...styles.input, fontWeight: 700 }}
+                />
+                <button
+                  onClick={() => handleSelectFullMonth(selectedMonth)}
+                  className="Btn BtnDark"
+                >
+                  Xem cả {currentMonthInfo.label}
                 </button>
-              )}
+                <button
+                  onClick={() => {
+                    const wk = getCurrentWeekRange();
+                    setStartDate(wk.start);
+                    setEndDate(wk.end);
+                    loadWeeklySummary(wk.start, wk.end);
+                  }}
+                  className="Btn BtnLight"
+                >
+                  Tuần này
+                </button>
+              </div>
+
+              <div className="SummaryFilterGroup">
+                <span className="SummaryFilterLabel">Từ:</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  style={styles.input}
+                />
+                <span className="SummaryFilterLabel">Đến:</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  style={styles.input}
+                />
+                <button
+                  onClick={() => loadWeeklySummary(startDate, endDate)}
+                  className="Btn BtnBlue"
+                >
+                  🔍 Lọc
+                </button>
+              </div>
+            </div>
+
+            <div className="SummaryControlRow SummaryControlBottom">
+              <div className="SummaryViewSwitch">
+                <button
+                  onClick={() => setSummaryViewMode('CARDS')}
+                  className={`SummarySwitchBtn ${summaryViewMode === 'CARDS' ? 'active' : ''}`}
+                >
+                  🗂 Dạng Thẻ PT
+                </button>
+                <button
+                  onClick={() => setSummaryViewMode('TABLE')}
+                  className={`SummarySwitchBtn ${summaryViewMode === 'TABLE' ? 'active' : ''}`}
+                >
+                  📋 Bảng Đối Chiếu Ngày
+                </button>
+              </div>
+
+              <div className="SummaryFilterGroup">
+                <button onClick={exportWeeklyToExcel} className="Btn BtnEmerald">
+                  📥 Xuất Excel ({formatVNDate(startDate).slice(0, 5)} → {formatVNDate(endDate).slice(0, 5)})
+                </button>
+
+                {isAdmin && (
+                  <button onClick={handleDeleteMonthSessions} className="Btn BtnRed">
+                    🗑 Xóa Chốt Ca {currentMonthInfo.label}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="ToolbarCard" style={{ margin: '0 0 12px 0' }}>
-            <div className="ToolSection">
-              <span style={{ fontSize: '13px', fontWeight: 700 }}>Từ ngày:</span>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={styles.input} />
-              <span style={{ fontSize: '13px', fontWeight: 700 }}>Đến ngày:</span>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={styles.input} />
-              <button onClick={() => loadWeeklySummary(startDate, endDate)} className="Btn BtnBlue">
-                🔍 Lọc Theo Ngày
-              </button>
+          {/* THANH KPI TỔNG QUAN */}
+          <div className="SummaryKpiGrid">
+            <div className="SummaryKpiCard kpi-blue">
+              <span className="SummaryKpiLabel">Tổng Ca Đã Chốt</span>
+              <strong className="SummaryKpiValue">{grandTotalShifts} ca</strong>
+            </div>
+            <div className="SummaryKpiCard kpi-purple">
+              <span className="SummaryKpiLabel">Tổng Ca Đôi</span>
+              <strong className="SummaryKpiValue">{grandTotalDouble} ca đôi</strong>
+            </div>
+            <div className="SummaryKpiCard kpi-green">
+              <span className="SummaryKpiLabel">PT Có Ca Chốt</span>
+              <strong className="SummaryKpiValue">
+                {activeTrainerCount} / {trainers.length} PT
+              </strong>
+            </div>
+            <div className="SummaryKpiCard kpi-slate">
+              <span className="SummaryKpiLabel">Kỳ Đang Xem ({allClosedDatesSorted.length} ngày chốt)</span>
+              <strong className="SummaryKpiValue" style={{ fontSize: '15px' }}>
+                {formatVNDate(startDate)} → {formatVNDate(endDate)}
+              </strong>
             </div>
           </div>
 
-          <div className="ClientCardsGrid">
-            {trainers.map(trainer => {
-              const item = weeklySummary.find(w => w._id === trainer._id);
-              const totalDouble = item?.totalDoubleShifts || 0;
-              return (
-                <div key={trainer._id} className="ClientItemCard">
-                  <div className="ClientCardTop">
-                    <strong style={{ fontSize: '16px', color: '#0f172a' }}>{trainer.name}</strong>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      {totalDouble > 0 && (
+          {/* CHẾ ĐỘ 1: DẠNG THẺ PT (ĐÃ SẮP XẾP ĐÚNG THỨ TỰ NGÀY & THẲNG CỘT) */}
+          {summaryViewMode === 'CARDS' ? (
+            <div className="SummaryCardsGrid">
+              {summaryByTrainer.map(({ trainer, totalShifts, totalDoubleShifts, dailyBreakdown }) => {
+                const barPercent = totalShifts > 0 ? Math.max(8, Math.round((totalShifts / maxTrainerShifts) * 100)) : 0;
+
+                return (
+                  <div
+                    key={trainer._id}
+                    className={`SummaryPTCard ${totalShifts === 0 ? 'empty-pt' : ''}`}
+                  >
+                    <div className="SummaryPTHeader">
+                      <div>
+                        <div className="SummaryPTName">{trainer.name}</div>
+                        <div className="SummaryPTSub">
+                          {dailyBreakdown.length > 0
+                            ? `${dailyBreakdown.length} ngày có ca chốt`
+                            : 'Chưa phát sinh ca chốt'}
+                        </div>
+                      </div>
+
+                      <div className="SummaryPTBadges">
+                        {totalDoubleShifts > 0 && (
+                          <span className="SummaryDoublePill">
+                            👥 {totalDoubleShifts} ca đôi
+                          </span>
+                        )}
                         <span
-                          className="StatusBadge"
-                          style={{ background: '#ede9fe', color: '#6d28d9', fontSize: '12px' }}
+                          className={`SummaryTotalPill ${totalShifts === 0 ? 'zero' : ''}`}
                         >
-                          📝 Có {totalDouble} ca đôi
+                          {totalShifts} ca
                         </span>
-                      )}
-                      <span
-                        className="StatusBadge"
-                        style={{ background: '#0f172a', color: '#4ade80', fontSize: '13px' }}
-                      >
-                        Tổng: {item ? item.totalShifts : 0} ca
-                      </span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {item?.dailyBreakdown?.map((d, i) => (
-                      <span key={i} className="ScheduleTag">
-                        Ngày {d.date.slice(5)}: {d.count} ca
-                        {d.doubleCount ? ` (có ${d.doubleCount} ca đôi)` : ''}
-                      </span>
-                    )) || (
-                      <span style={{ color: '#94a3b8', fontSize: '13px' }}>
-                        Chưa có ngày chốt ca trong khoảng này
-                      </span>
+                    <div className="SummaryProgressTrack">
+                      <div
+                        className="SummaryProgressFill"
+                        style={{ width: `${barPercent}%` }}
+                      />
+                    </div>
+
+                    {dailyBreakdown.length > 0 ? (
+                      <div className="SummaryDayList">
+                        {dailyBreakdown.map(d => (
+                          <div key={d.date} className="SummaryDayRow">
+                            <span className="SummaryDayDate">
+                              📅 {formatShortDate(d.date)}
+                            </span>
+                            <div className="SummaryDayRight">
+                              {d.doubleCount > 0 && (
+                                <span className="SummaryDayDoubleTag">
+                                  {d.doubleCount} ca đôi
+                                </span>
+                              )}
+                              <span className="SummaryDayCount">{d.count} ca</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="SummaryEmptyState">
+                        Chưa có ngày chốt ca trong khoảng thời gian này
+                      </div>
                     )}
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* CHẾ ĐỘ 2: BẢNG ĐỐI CHIẾU THEO TỪNG NGÀY TĂNG DẦN */
+            <div className="BoardCard" style={{ marginTop: '12px' }}>
+              <div className="TableScrollBox">
+                <table className="SummaryMatrixTable">
+                  <thead>
+                    <tr>
+                      <th className="SummaryStickyPT">Huấn Luyện Viên</th>
+                      {allClosedDatesSorted.map(dateStr => (
+                        <th key={dateStr} className="SummaryThDate">
+                          {formatShortDate(dateStr)}
+                        </th>
+                      ))}
+                      <th className="SummaryThTotal">Ca Đôi</th>
+                      <th className="SummaryThTotal">Tổng Ca</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summaryByTrainer.map(({ trainer, totalShifts, totalDoubleShifts, dailyBreakdown }) => (
+                      <tr key={trainer._id}>
+                        <td className="SummaryStickyPT">{trainer.name}</td>
+                        {allClosedDatesSorted.map(dateStr => {
+                          const found = dailyBreakdown.find(d => d.date === dateStr);
+                          return (
+                            <td key={dateStr} className="SummaryTdCell">
+                              {found ? (
+                                <div className="SummaryCellStack">
+                                  <strong>{found.count}</strong>
+                                  {found.doubleCount > 0 && (
+                                    <span className="SummaryCellDbl">+{found.doubleCount} đôi</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span style={{ color: '#cbd5e1' }}>—</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="SummaryTdCell">
+                          {totalDoubleShifts > 0 ? (
+                            <span className="SummaryDayDoubleTag">{totalDoubleShifts}</span>
+                          ) : (
+                            <span style={{ color: '#cbd5e1' }}>0</span>
+                          )}
+                        </td>
+                        <td className="SummaryTdTotal">{totalShifts}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="SummaryFooterTr">
+                      <td className="SummaryStickyPT" style={{ background: '#0f172a', color: '#fff' }}>
+                        Tổng Cộng
+                      </td>
+                      {allClosedDatesSorted.map(dateStr => {
+                        const daySum = summaryByTrainer.reduce((acc, x) => {
+                          const found = x.dailyBreakdown.find(d => d.date === dateStr);
+                          return acc + (found ? found.count : 0);
+                        }, 0);
+                        return (
+                          <td key={dateStr} style={{ textAlign: 'center', fontWeight: 800 }}>
+                            {daySum}
+                          </td>
+                        );
+                      })}
+                      <td style={{ textAlign: 'center', color: '#fde047', fontWeight: 800 }}>
+                        {grandTotalDouble}
+                      </td>
+                      <td style={{ textAlign: 'center', color: '#4ade80', fontWeight: 900, fontSize: '14px' }}>
+                        {grandTotalShifts}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

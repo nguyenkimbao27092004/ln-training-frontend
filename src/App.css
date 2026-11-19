@@ -857,3 +857,371 @@ body {
   .ToolbarCard { margin: 8px 8px 0; padding: 10px; }
   .MainArea { padding: 8px 8px 20px; }
 }
+/* ==================== TAB 3: TỔNG HỢP & DỌN THÁNG (TỐI ƯU GIAO DIỆN) ==================== */
+.SummaryControlPanel {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  margin-bottom: 12px;
+}
+
+.SummaryControlRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.SummaryControlBottom {
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.SummaryFilterGroup {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.SummaryFilterLabel {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #334155;
+}
+
+.SummaryViewSwitch {
+  display: inline-flex;
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 9px;
+  gap: 4px;
+}
+
+.SummarySwitchBtn {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.SummarySwitchBtn.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+}
+
+/* KPI Strip */
+.SummaryKpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.SummaryKpiCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #2563eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.03);
+}
+
+.SummaryKpiCard.kpi-blue { border-left-color: #2563eb; }
+.SummaryKpiCard.kpi-purple { border-left-color: #7c3aed; }
+.SummaryKpiCard.kpi-green { border-left-color: #16a34a; }
+.SummaryKpiCard.kpi-slate { border-left-color: #0f172a; }
+
+.SummaryKpiLabel {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+
+.SummaryKpiValue {
+  font-size: 19px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* Grid thẻ tổng hợp từng PT */
+.SummaryCardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.SummaryPTCard {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  transition: 0.15s;
+}
+
+.SummaryPTCard:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.08);
+}
+
+.SummaryPTCard.empty-pt {
+  background: #f8fafc;
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.SummaryPTHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.SummaryPTName {
+  font-size: 15.5px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.SummaryPTSub {
+  font-size: 11.5px;
+  color: #64748b;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.SummaryPTBadges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.SummaryDoublePill {
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
+  padding: 4px 9px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.SummaryTotalPill {
+  background: #0f172a;
+  color: #4ade80;
+  padding: 4px 11px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.SummaryTotalPill.zero {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.SummaryProgressTrack {
+  width: 100%;
+  height: 5px;
+  background: #f1f5f9;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.SummaryProgressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb 0%, #10b981 100%);
+  border-radius: 99px;
+  transition: width 0.25s ease;
+}
+
+/* Danh sách từng ngày thẳng hàng, có thanh cuộn khi xem cả tháng */
+.SummaryDayList {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 230px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.SummaryDayRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  transition: 0.12s;
+}
+
+.SummaryDayRow:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.SummaryDayDate {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1e293b;
+  font-variant-numeric: tabular-nums;
+}
+
+.SummaryDayRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.SummaryDayDoubleTag {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.SummaryDayCount {
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 9px;
+  border-radius: 6px;
+  min-width: 48px;
+  text-align: center;
+}
+
+.SummaryEmptyState {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 18px 10px;
+  background: #ffffff;
+  border: 1px dashed #e2e8f0;
+  border-radius: 8px;
+}
+
+/* Chế độ Bảng Đối Chiếu Ngày */
+.SummaryMatrixTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.SummaryMatrixTable th,
+.SummaryMatrixTable td {
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 9px 10px;
+  white-space: nowrap;
+}
+
+.SummaryStickyPT {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: #ffffff;
+  font-weight: 800;
+  color: #0f172a;
+  border-right: 2px solid #cbd5e1 !important;
+  min-width: 150px;
+}
+
+.SummaryMatrixTable thead .SummaryStickyPT {
+  background: #f8fafc;
+}
+
+.SummaryThDate {
+  background: #f8fafc;
+  text-align: center;
+  font-weight: 800;
+  color: #334155;
+  font-size: 12px;
+}
+
+.SummaryThTotal {
+  background: #fef9c3;
+  text-align: center;
+  font-weight: 800;
+  color: #713f12;
+}
+
+.SummaryTdCell {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.SummaryCellStack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.SummaryCellDbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.SummaryTdTotal {
+  text-align: center;
+  font-weight: 800;
+  color: #15803d;
+  background: #f0fdf4;
+}
+
+.SummaryFooterTr td {
+  background: #0f172a;
+  color: #ffffff;
+  padding: 10px;
+}
+
+@media (max-width: 900px) {
+  .SummaryKpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 540px) {
+  .SummaryKpiGrid {
+    grid-template-columns: 1fr;
+  }
+}
