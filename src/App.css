@@ -1010,7 +1010,510 @@ body {
   flex-shrink: 0;
 }
 
-/* TAB 2 & 3: LƯỚI THẺ HIỆN ĐẠI */
+/* ==================== TAB 2: LỊCH TUẦN & DANH SÁCH KHÁCH HÀNG (TỐI ƯU GIAO DIỆN & TÌM KIẾM) ==================== */
+.ClientsControlPanel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  margin-bottom: 14px;
+}
+
+.ClientsTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.SmartSearchWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 260px;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 4px 8px 4px 12px;
+  gap: 8px;
+  transition: all 0.16s ease;
+}
+
+.SmartSearchWrap:focus-within {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.SmartSearchIcon {
+  font-size: 14px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.SmartSearchInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #0f172a;
+  width: 100%;
+  padding: 5px 0;
+}
+
+.SmartSearchInput::placeholder {
+  color: #94a3b8;
+}
+
+.SmartSearchClear {
+  border: none;
+  background: #e2e8f0;
+  color: #475569;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: 0.15s;
+}
+
+.SmartSearchClear:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
+.SearchResultCountBadge {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 99px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.ClientsAdminActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ClientsBottomRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.QuickFilterPills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.QuickPill {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  padding: 5px 11px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.QuickPill span {
+  background: rgba(15, 23, 42, 0.08);
+  padding: 1px 6px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.QuickPill:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+
+.QuickPill.active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+.QuickPill.active span {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.QuickPill.pill-green.active {
+  background: #16a34a;
+  border-color: #16a34a;
+}
+
+.QuickPill.pill-amber.active {
+  background: #d97706;
+  border-color: #d97706;
+}
+
+.QuickPill.pill-rose.active {
+  background: #e11d48;
+  border-color: #e11d48;
+}
+
+.ClientsSelectFilters {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.CleanSelect {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 12.5px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.CleanSelect:focus {
+  border-color: #2563eb;
+}
+
+.ResetFilterBtn {
+  border: 1px solid #fecdd3;
+  background: #fff1f2;
+  color: #be123c;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.ResetFilterBtn:hover {
+  background: #ffe4e6;
+}
+
+/* Lưới thẻ Khách Hàng hiện đại */
+.ClientsGridV2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(295px, 1fr));
+  gap: 13px;
+  align-items: stretch;
+}
+
+.ClientCardV2 {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  border-top: 3px solid #10b981;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  transition: all 0.18s ease;
+}
+
+.ClientCardV2:hover {
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07);
+}
+
+.ClientCardV2.is-paused {
+  border-top-color: #f59e0b;
+  background: #fffefb;
+}
+
+.ClientCardV2Header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.ClientCardV2Identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ClientAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ClientAvatar.active {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+}
+
+.ClientAvatar.paused {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.ClientNameBlock {
+  min-width: 0;
+  flex: 1;
+}
+
+.ClientNameText {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.ClientPtLine {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.ClientPtLine strong {
+  color: #334155;
+}
+
+.ClientSessionDot {
+  color: #cbd5e1;
+}
+
+.ClientStatusPill {
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ClientStatusPill.active {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.ClientStatusPill.paused {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.ClientPhoneRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.ClientPhoneRow.has-phone {
+  background: #f0f9ff;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  font-variant-numeric: tabular-nums;
+}
+
+.ClientPhoneRow.missing-phone {
+  background: #f8fafc;
+  color: #94a3b8;
+  border: 1px dashed #cbd5e1;
+  font-weight: 500;
+}
+
+.ClientSlotsWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.ClientSlotChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  padding: 3px 7px 3px 4px;
+  font-size: 11.5px;
+  line-height: 1.2;
+}
+
+.ClientSlotChip.has-workout {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.SlotDayLabel {
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 5px;
+  border-radius: 5px;
+}
+
+.SlotTimeLabel {
+  font-weight: 800;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.SlotWorkoutLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1d4ed8;
+  border-left: 1px solid #bfdbfe;
+  padding-left: 5px;
+}
+
+.NoSlotsHint {
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.ClientNoteChip {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  padding: 6px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #92400e;
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ClientCardV2Footer {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ClientTimeStamp {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ClientTimeStamp.edited {
+  color: #15803d;
+}
+
+.ClientEditBtn {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #1e293b;
+  padding: 5px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.ClientEditBtn:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
+
+.ClientsEmptyBox {
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  padding: 36px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.ClientsEmptyIcon {
+  font-size: 32px;
+  margin-bottom: 4px;
+}
+
+.ClientsEmptyTitle {
+  font-size: 15.5px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.ClientsEmptySub {
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* LƯỚI THẺ DÙNG CHUNG (PORTAL KHÁCH HÀNG) */
 .ClientCardsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));

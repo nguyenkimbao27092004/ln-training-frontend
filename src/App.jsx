@@ -94,6 +94,8 @@ export default function App() {
 
   const [filterTrainer, setFilterTrainer] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL'); // ALL | ACTIVE | PAUSED
+  const [filterDay, setFilterDay] = useState('ALL'); // ALL | 2..8
+  const [filterMissingPhone, setFilterMissingPhone] = useState(false);
   const [searchClient, setSearchClient] = useState('');
   const [sortClientMode, setSortClientMode] = useState('DEFAULT');
   const [editingClient, setEditingClient] = useState(null);
@@ -1005,29 +1007,85 @@ export default function App() {
     s => s.status === 'CANCELLED' && s.clientName !== 'OFF'
   ).length;
 
+  const activeClientsCount = clients.filter(c => c.status === 'ACTIVE').length;
   const pausedClientsCount = clients.filter(c => c.status === 'PAUSED').length;
+  const missingPhoneClientsCount = clients.filter(c => !String(c.phone || '').trim()).length;
 
-  // Tìm kiếm khách hàng bằng cả TÊN, SỐ ĐIỆN THOẠI hoặc 4 SỐ CUỐI
+  // Chuẩn hóa tiếng Việt không dấu để tìm kiếm cực nhanh & chính xác
+  const normalizeVi = (str = '') =>
+    String(str)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLowerCase()
+      .trim();
+
+  const hasActiveClientFilters =
+    filterTrainer !== 'ALL' ||
+    filterStatus !== 'ALL' ||
+    filterDay !== 'ALL' ||
+    filterMissingPhone ||
+    searchClient.trim() !== '';
+
+  const resetClientFilters = () => {
+    setFilterTrainer('ALL');
+    setFilterStatus('ALL');
+    setFilterDay('ALL');
+    setFilterMissingPhone(false);
+    setSearchClient('');
+    setSortClientMode('DEFAULT');
+  };
+
+  // Tìm kiếm thông minh: hỗ trợ tiếng Việt không dấu, nhiều từ khóa, SĐT/4 số cuối, tên PT, giờ tập, nhóm cơ, ghi chú
   const displayedClients = clients
-    .filter(c => filterTrainer === 'ALL' || (c.primaryTrainerId?._id || c.primaryTrainerId) === filterTrainer)
+    .filter(c => filterTrainer === 'ALL' || String(c.primaryTrainerId?._id || c.primaryTrainerId) === String(filterTrainer))
     .filter(c => filterStatus === 'ALL' || c.status === filterStatus)
+    .filter(c => !filterMissingPhone || !String(c.phone || '').trim())
     .filter(c => {
-      const q = searchClient.toLowerCase().trim();
-      if (!q) return true;
-      const qDigits = q.replace(/\D/g, '');
-      const rawPhone = (c.phone || '').toLowerCase();
+      if (filterDay === 'ALL') return true;
+      const targetDay = Number(filterDay);
+      return (c.weeklySchedule || []).some(slot => Number(slot.dayOfWeek) === targetDay);
+    })
+    .filter(c => {
+      const normalizedQuery = normalizeVi(searchClient);
+      if (!normalizedQuery) return true;
+      const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+
+      const { cleanNote } = parseClientNoteAndTime(c.packageNote, c.updatedAt);
+      const rawPhone = String(c.phone || '');
       const phoneDigits = rawPhone.replace(/\D/g, '');
-      const matchName = c.name.toLowerCase().includes(q);
-      const matchPhone = rawPhone.includes(q) || (qDigits.length > 0 && phoneDigits.includes(qDigits));
-      return matchName || matchPhone;
+      const ptName = c.primaryTrainerId?.name || '';
+      const scheduleText = (c.weeklySchedule || [])
+        .map(s => {
+          const dayToken = s.dayOfWeek === 8 ? 'cn chu nhat t8' : `t${s.dayOfWeek} thu ${s.dayOfWeek}`;
+          return `${dayToken} ${s.time || ''} ${s.workoutType || ''} ${s.workoutNote || ''}`;
+        })
+        .join(' ');
+
+      const haystack = normalizeVi(`${c.name} ${rawPhone} ${phoneDigits} ${ptName} ${cleanNote} ${scheduleText}`);
+      return tokens.every(token => {
+        const tokenDigits = token.replace(/\D/g, '');
+        if (haystack.includes(token)) return true;
+        if (tokenDigits.length > 0 && phoneDigits.includes(tokenDigits)) return true;
+        return false;
+      });
     })
     .sort((a, b) => {
-      if (sortClientMode !== 'RECENT') return 0;
-      const timeA = parseClientNoteAndTime(a.packageNote, a.updatedAt).updatedAt;
-      const timeB = parseClientNoteAndTime(b.packageNote, b.updatedAt).updatedAt;
-      const msA = timeA ? new Date(timeA).getTime() : 0;
-      const msB = timeB ? new Date(timeB).getTime() : 0;
-      return msB - msA;
+      if (sortClientMode === 'RECENT') {
+        const timeA = parseClientNoteAndTime(a.packageNote, a.updatedAt).updatedAt;
+        const timeB = parseClientNoteAndTime(b.packageNote, b.updatedAt).updatedAt;
+        const msA = timeA ? new Date(timeA).getTime() : 0;
+        const msB = timeB ? new Date(timeB).getTime() : 0;
+        return msB - msA;
+      }
+      if (sortClientMode === 'NAME_ASC') {
+        return (a.name || '').localeCompare(b.name || '', 'vi');
+      }
+      if (sortClientMode === 'MOST_SESSIONS') {
+        return (b.weeklySchedule?.length || 0) - (a.weeklySchedule?.length || 0);
+      }
+      return 0;
     });
 
   const currentMonthInfo = getMonthRange(selectedMonth);
@@ -1600,172 +1658,284 @@ export default function App() {
         </>
       )}
 
-      {/* ==================== TAB 2: QUẢN LÝ LỊCH TUẦN, SĐT & GHI BÀI TẬP ==================== */}
+      {/* ==================== TAB 2: QUẢN LÝ LỊCH TUẦN, SĐT & GHI BÀI TẬP (TỐI ƯU GIAO DIỆN & TÌM KIẾM) ==================== */}
       {activeTab === 'CLIENTS' && (
         <div className="MainArea">
-          <div className="ToolbarCard" style={{ margin: '0 0 12px 0' }}>
-            <div className="ToolSection" style={{ flex: 1 }}>
-              <select
-                value={filterTrainer}
-                onChange={e => setFilterTrainer(e.target.value)}
-                style={styles.input}
-              >
-                <option value="ALL">Tất cả PT ({clients.length} khách)</option>
-                {trainers.map(t => (
-                  <option key={t._id} value={t._id}>{t.name}</option>
-                ))}
-              </select>
+          {/* BẢNG ĐIỀU KHIỂN & TÌM KIẾM THÔNG MINH */}
+          <div className="ClientsControlPanel">
+            {/* Tầng 1: Ô tìm kiếm thông minh + Nút thao tác Admin */}
+            <div className="ClientsTopRow">
+              <div className="SmartSearchWrap">
+                <span className="SmartSearchIcon">🔍</span>
+                <input
+                  type="text"
+                  placeholder="Tìm nhanh không dấu: tên khách, SĐT/4 số cuối, tên PT, giờ (7h15), thứ (T2), nhóm cơ..."
+                  value={searchClient}
+                  onChange={e => setSearchClient(e.target.value)}
+                  className="SmartSearchInput"
+                />
+                {searchClient && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchClient('')}
+                    className="SmartSearchClear"
+                    title="Xóa từ khóa"
+                  >
+                    ✕
+                  </button>
+                )}
+                <span className="SearchResultCountBadge">
+                  {displayedClients.length}/{clients.length}
+                </span>
+              </div>
 
-              <select
-                value={filterStatus}
-                onChange={e => setFilterStatus(e.target.value)}
-                style={styles.input}
-              >
-                <option value="ALL">Tất cả trạng thái</option>
-                <option value="ACTIVE">● Đang tập ({clients.filter(c => c.status === 'ACTIVE').length})</option>
-                <option value="PAUSED">⏸ Tạm nghỉ / OFF ({pausedClientsCount})</option>
-              </select>
+              {isAdmin && (
+                <div className="ClientsAdminActions">
+                  <button
+                    onClick={handlePauseAllClients}
+                    className="Btn BtnOrange"
+                    title="Chuyển toàn bộ khách hàng sang Tạm nghỉ (OFF) để kiểm tra ai tập tuần mới"
+                  >
+                    ⏸ Chuyển Toàn Bộ OFF
+                  </button>
 
-              <select
-                value={sortClientMode}
-                onChange={e => setSortClientMode(e.target.value)}
-                style={styles.input}
-              >
-                <option value="DEFAULT">📑 Sắp xếp: Mặc định</option>
-                <option value="RECENT">🕒 Sắp xếp: Mới chỉnh sửa gần nhất</option>
-              </select>
-
-              <input
-                type="text"
-                placeholder="🔍 Tìm tên, SĐT hoặc 4 số cuối khách hàng..."
-                value={searchClient}
-                onChange={e => setSearchClient(e.target.value)}
-                style={{ ...styles.input, flex: 1, minWidth: '200px' }}
-              />
+                  <button
+                    onClick={() =>
+                      setEditingClient({
+                        name: '',
+                        phone: '',
+                        primaryTrainerId: trainers[0]?._id || '',
+                        status: 'ACTIVE',
+                        packageNote: '',
+                        weeklySchedule: []
+                      })
+                    }
+                    className="Btn BtnBlue"
+                  >
+                    + Thêm Khách Mới
+                  </button>
+                </div>
+              )}
             </div>
 
-            {isAdmin && (
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {/* Tầng 2: Thẻ lọc trạng thái nhanh + Bộ lọc PT / Thứ trong tuần / Sắp xếp */}
+            <div className="ClientsBottomRow">
+              <div className="QuickFilterPills">
                 <button
-                  onClick={handlePauseAllClients}
-                  className="Btn BtnOrange"
-                  title="Chuyển toàn bộ khách hàng sang Tạm nghỉ (OFF) để kiểm tra ai tập tuần mới"
+                  type="button"
+                  onClick={() => {
+                    setFilterStatus('ALL');
+                    setFilterMissingPhone(false);
+                  }}
+                  className={`QuickPill ${filterStatus === 'ALL' && !filterMissingPhone ? 'active' : ''}`}
                 >
-                  ⏸ Chuyển Toàn Bộ Sang OFF
+                  Tất cả <span>{clients.length}</span>
                 </button>
-
                 <button
-                  onClick={() =>
-                    setEditingClient({
-                      name: '',
-                      phone: '',
-                      primaryTrainerId: trainers[0]?._id || '',
-                      status: 'ACTIVE',
-                      packageNote: '',
-                      weeklySchedule: []
-                    })
-                  }
-                  className="Btn BtnBlue"
+                  type="button"
+                  onClick={() => {
+                    setFilterStatus('ACTIVE');
+                    setFilterMissingPhone(false);
+                  }}
+                  className={`QuickPill pill-green ${filterStatus === 'ACTIVE' && !filterMissingPhone ? 'active' : ''}`}
                 >
-                  + Thêm Khách Mới
+                  ● Đang tập <span>{activeClientsCount}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterStatus('PAUSED');
+                    setFilterMissingPhone(false);
+                  }}
+                  className={`QuickPill pill-amber ${filterStatus === 'PAUSED' && !filterMissingPhone ? 'active' : ''}`}
+                >
+                  ⏸ Tạm nghỉ <span>{pausedClientsCount}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterMissingPhone(!filterMissingPhone)}
+                  className={`QuickPill pill-rose ${filterMissingPhone ? 'active' : ''}`}
+                  title="Lọc nhanh các hội viên chưa cập nhật SĐT để nhắn bổ sung"
+                >
+                  📵 Thiếu SĐT <span>{missingPhoneClientsCount}</span>
                 </button>
               </div>
-            )}
-          </div>
 
-          <div className="ClientCardsGrid">
-            {displayedClients.map(client => {
-              const { cleanNote, updatedAt } = parseClientNoteAndTime(
-                client.packageNote,
-                client.updatedAt
-              );
-              const formattedTime = formatUpdateTime(updatedAt);
+              <div className="ClientsSelectFilters">
+                <select
+                  value={filterTrainer}
+                  onChange={e => setFilterTrainer(e.target.value)}
+                  className="CleanSelect"
+                >
+                  <option value="ALL">👨‍🏫 Tất cả PT</option>
+                  {trainers.map(t => (
+                    <option key={t._id} value={t._id}>{t.name}</option>
+                  ))}
+                </select>
 
-              return (
-                <div key={client._id} className="ClientItemCard">
-                  <div className="ClientCardTop">
-                    <div>
-                      <div style={{ fontSize: '15.5px', fontWeight: 800, color: '#0f172a' }}>
-                        {client.name}
-                      </div>
-                      <div style={{ fontSize: '12.5px', color: '#0369a1', fontWeight: 700, marginTop: '2px' }}>
-                        📱 SĐT: {client.phone ? client.phone : <span style={{ color: '#94a3b8', fontWeight: 500 }}>Chưa cập nhật</span>}
-                      </div>
-                      <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
-                        PT Quản lý: <strong style={{ color: '#1e293b' }}>{client.primaryTrainerId?.name || '—'}</strong>
-                      </div>
-                    </div>
+                <select
+                  value={filterDay}
+                  onChange={e => setFilterDay(e.target.value)}
+                  className="CleanSelect"
+                >
+                  <option value="ALL">📅 Tất cả các thứ</option>
+                  {DAYS.map(d => (
+                    <option key={d.num} value={d.num}>Tập {d.label}</option>
+                  ))}
+                </select>
 
-                    <span
-                      className="StatusBadge"
-                      style={{
-                        background: client.status === 'ACTIVE' ? '#dcfce7' : '#fef3c7',
-                        color: client.status === 'ACTIVE' ? '#166534' : '#92400e'
-                      }}
-                    >
-                      {client.status === 'ACTIVE' ? '● Đang tập' : '⏸ Tạm nghỉ (OFF)'}
-                    </span>
-                  </div>
+                <select
+                  value={sortClientMode}
+                  onChange={e => setSortClientMode(e.target.value)}
+                  className="CleanSelect"
+                >
+                  <option value="DEFAULT">📑 Sắp xếp: Mặc định</option>
+                  <option value="RECENT">🕒 Mới sửa gần nhất</option>
+                  <option value="NAME_ASC">🔤 Tên A → Z</option>
+                  <option value="MOST_SESSIONS">🔥 Nhiều buổi/tuần nhất</option>
+                </select>
 
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {client.weeklySchedule
-                      ?.sort((a, b) => a.dayOfWeek - b.dayOfWeek)
-                      .map((slot, idx) => (
-                        <span key={idx} className="ScheduleTag">
-                          T{slot.dayOfWeek}: {slot.time || 'Báo sau'}
-                          {slot.workoutType ? ` • ${slot.workoutType}` : ''}
-                        </span>
-                      ))}
-                  </div>
-
-                  {cleanNote && (
-                    <div
-                      style={{
-                        background: '#fffbeb',
-                        border: '1px solid #fde68a',
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        color: '#92400e',
-                        fontWeight: 600
-                      }}
-                    >
-                      📌 {cleanNote}
-                    </div>
-                  )}
-
-                  <div
-                    className={`ModifiedTimeBox ${formattedTime ? 'edited' : 'unchanged'}`}
-                    style={{ marginTop: 'auto' }}
+                {hasActiveClientFilters && (
+                  <button
+                    type="button"
+                    onClick={resetClientFilters}
+                    className="ResetFilterBtn"
+                    title="Xóa toàn bộ bộ lọc đang áp dụng"
                   >
-                    <span>
-                      {formattedTime
-                        ? `🕒 Đã sửa: ${formattedTime}`
-                        : '🕒 Chưa có lịch sử chỉnh sửa'}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <button
-                      onClick={() =>
-                        setEditingClient({
-                          ...client,
-                          phone: client.phone || '',
-                          packageNote: cleanNote,
-                          lastModifiedDisplay: formattedTime,
-                          primaryTrainerId: client.primaryTrainerId?._id || client.primaryTrainerId
-                        })
-                      }
-                      className="Btn BtnLight"
-                      style={{ width: '100%' }}
-                    >
-                      {isAdmin ? '✏️ Sửa Lịch / SĐT / Ghi Bài Tập' : '🏋️ Ghi Bài Tập & SĐT Khách'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                    ↺ Đặt lại
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
+
+          {/* DANH SÁCH THẺ KHÁCH HÀNG (GIAO DIỆN GỌN, HIỆN ĐẠI, DỄ QUÉT) */}
+          {displayedClients.length === 0 ? (
+            <div className="ClientsEmptyBox">
+              <div className="ClientsEmptyIcon">🔎</div>
+              <div className="ClientsEmptyTitle">Không tìm thấy học viên nào phù hợp</div>
+              <div className="ClientsEmptySub">
+                Thử gõ từ khóa ngắn hơn (không cần dấu), kiểm tra lại bộ lọc PT hoặc thứ trong tuần.
+              </div>
+              {hasActiveClientFilters && (
+                <button type="button" onClick={resetClientFilters} className="Btn BtnBlue" style={{ marginTop: '10px' }}>
+                  ↺ Xóa toàn bộ bộ lọc
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="ClientsGridV2">
+              {displayedClients.map(client => {
+                const { cleanNote, updatedAt } = parseClientNoteAndTime(
+                  client.packageNote,
+                  client.updatedAt
+                );
+                const formattedTime = formatUpdateTime(updatedAt);
+                const isActive = client.status === 'ACTIVE';
+                const sortedSlots = [...(client.weeklySchedule || [])].sort(
+                  (a, b) => a.dayOfWeek - b.dayOfWeek
+                );
+                const cleanNameWords = (client.name || '').trim().split(/\s+/).filter(Boolean);
+                const clientInitials =
+                  cleanNameWords.length >= 2
+                    ? (cleanNameWords[0][0] + cleanNameWords[cleanNameWords.length - 1][0]).toUpperCase()
+                    : (client.name || 'HV').slice(0, 2).toUpperCase();
+
+                return (
+                  <div
+                    key={client._id}
+                    className={`ClientCardV2 ${isActive ? 'is-active' : 'is-paused'}`}
+                  >
+                    {/* Header: Avatar + Tên + Trạng thái */}
+                    <div className="ClientCardV2Header">
+                      <div className="ClientCardV2Identity">
+                        <span className={`ClientAvatar ${isActive ? 'active' : 'paused'}`}>
+                          {clientInitials}
+                        </span>
+                        <div className="ClientNameBlock">
+                          <div className="ClientNameText" title={client.name}>
+                            {client.name}
+                          </div>
+                          <div className="ClientPtLine">
+                            PT: <strong>{client.primaryTrainerId?.name || '—'}</strong>
+                            <span className="ClientSessionDot">•</span>
+                            <span>{sortedSlots.length} buổi/tuần</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className={`ClientStatusPill ${isActive ? 'active' : 'paused'}`}>
+                        {isActive ? '● Đang tập' : '⏸ OFF'}
+                      </span>
+                    </div>
+
+                    {/* Thông tin SĐT */}
+                    <div className={`ClientPhoneRow ${client.phone ? 'has-phone' : 'missing-phone'}`}>
+                      <span>📱</span>
+                      {client.phone ? (
+                        <strong>{client.phone}</strong>
+                      ) : (
+                        <span>Chưa cập nhật SĐT</span>
+                      )}
+                    </div>
+
+                    {/* Lịch tập trong tuần */}
+                    <div className="ClientSlotsWrap">
+                      {sortedSlots.length > 0 ? (
+                        sortedSlots.map((slot, idx) => (
+                          <div
+                            key={idx}
+                            className={`ClientSlotChip ${slot.workoutType ? 'has-workout' : ''}`}
+                          >
+                            <span className="SlotDayLabel">
+                              {slot.dayOfWeek === 8 ? 'CN' : `T${slot.dayOfWeek}`}
+                            </span>
+                            <span className="SlotTimeLabel">{slot.time || 'Báo sau'}</span>
+                            {slot.workoutType && (
+                              <span className="SlotWorkoutLabel">{slot.workoutType}</span>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="NoSlotsHint">Chưa xếp buổi tập cố định trong tuần</span>
+                      )}
+                    </div>
+
+                    {cleanNote && (
+                      <div className="ClientNoteChip" title={cleanNote}>
+                        📌 {cleanNote}
+                      </div>
+                    )}
+
+                    {/* Footer gọn: Thời gian sửa + Nút hành động */}
+                    <div className="ClientCardV2Footer">
+                      <span
+                        className={`ClientTimeStamp ${formattedTime ? 'edited' : ''}`}
+                        title={formattedTime ? `Chỉnh sửa lần cuối: ${formattedTime}` : 'Chưa có lịch sử sửa'}
+                      >
+                        🕒 {formattedTime ? formattedTime.replace(' — ', ' • ') : 'Chưa sửa'}
+                      </span>
+
+                      <button
+                        onClick={() =>
+                          setEditingClient({
+                            ...client,
+                            phone: client.phone || '',
+                            packageNote: cleanNote,
+                            lastModifiedDisplay: formattedTime,
+                            primaryTrainerId: client.primaryTrainerId?._id || client.primaryTrainerId
+                          })
+                        }
+                        className="ClientEditBtn"
+                      >
+                        {isAdmin ? '✏️ Sửa lịch / SĐT' : '🏋️ Ghi bài tập'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
