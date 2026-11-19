@@ -24,6 +24,168 @@ import {
 } from './utils';
 import Modals from './Modals';
 
+// ==================== HỆ THỐNG ICON VECTOR TỐI GIẢN (SVG) CHO KHÁCH HÀNG & PT ====================
+const SvgDumbbell = ({ size = 18 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.1"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M6.5 6.5h-2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1z" />
+    <path d="M19.5 6.5h-2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1z" />
+    <path d="M2 9.5v5" />
+    <path d="M22 9.5v5" />
+    <path d="M7.5 12h9" />
+  </svg>
+);
+
+const SvgPause = ({ size = 18 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.3"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <rect x="6" y="5" width="4" height="14" rx="1.5" />
+    <rect x="14" y="5" width="4" height="14" rx="1.5" />
+  </svg>
+);
+
+const SvgUserCheck = ({ size = 18 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.1"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="3.8" />
+    <polyline points="16 11 18 13 22 9" />
+  </svg>
+);
+
+const SvgUsersGroup = ({ size = 18 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.1"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M16 21v-2a4 4 0 0 0-4-4H5.5a4 4 0 0 0-4 4v2" />
+    <circle cx="8.75" cy="7" r="3.5" />
+    <path d="M22.5 21v-2a4 4 0 0 0-3-3.85" />
+    <path d="M16.5 3.2a3.5 3.5 0 0 1 0 6.6" />
+  </svg>
+);
+
+const SvgVideoOnline = ({ size = 18 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.1"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <rect x="2.5" y="6" width="13.5" height="12" rx="2.5" />
+    <path d="m21.5 8.5-5.5 3.5 5.5 3.5v-7z" />
+  </svg>
+);
+
+// Tự động phân loại khách hàng (OFF / Tập nhóm / Tập Online / Tập 1-1) để chọn icon & màu tương ứng
+function getClientVisualInfo(client = {}) {
+  const isActive = client.status === 'ACTIVE';
+  if (!isActive) {
+    return {
+      variant: 'paused',
+      label: 'Hội viên đang tạm nghỉ (OFF)',
+      renderIcon: (size = 18) => <SvgPause size={size} />
+    };
+  }
+
+  const normalizedName = String(client.name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  const isGroup =
+    normalizedName.includes('nhom') ||
+    normalizedName.includes('+') ||
+    normalizedName.includes('ca doi') ||
+    normalizedName.includes('cap ') ||
+    /\b\d+\s*nguoi\b/.test(normalizedName);
+
+  if (isGroup) {
+    return {
+      variant: 'group',
+      label: 'Hội viên tập nhóm / ca đôi',
+      renderIcon: (size = 18) => <SvgUsersGroup size={size} />
+    };
+  }
+
+  const isOnline = /\b(online|onl)\b/.test(normalizedName);
+  if (isOnline) {
+    return {
+      variant: 'online',
+      label: 'Hội viên tập Online',
+      renderIcon: (size = 18) => <SvgVideoOnline size={size} />
+    };
+  }
+
+  return {
+    variant: 'active',
+    label: 'Hội viên tập 1-1 đang hoạt động',
+    renderIcon: (size = 18) => <SvgUserCheck size={size} />
+  };
+}
+
+// Tự động phân loại trạng thái PT (Nghỉ phép OFF / Đang có ca / Chưa có ca)
+function getTrainerVisualInfo({ isOff = false, validCount = 0 } = {}) {
+  if (isOff) {
+    return {
+      variant: 'off',
+      label: 'Huấn luyện viên đang nghỉ phép (OFF)',
+      renderIcon: (size = 17) => <SvgPause size={size} />
+    };
+  }
+  if (validCount > 0) {
+    return {
+      variant: 'active',
+      label: `Huấn luyện viên đang có ${validCount} ca`,
+      renderIcon: (size = 17) => <SvgDumbbell size={size} />
+    };
+  }
+  return {
+    variant: 'idle',
+    label: 'Huấn luyện viên chưa có ca',
+    renderIcon: (size = 17) => <SvgDumbbell size={size} />
+  };
+}
+
 export default function App() {
   const weekRange = getCurrentWeekRange();
 
@@ -108,25 +270,6 @@ export default function App() {
   const [summaryViewMode, setSummaryViewMode] = useState('CARDS'); // CARDS | TABLE
 
   const isAdmin = currentUser?.role === 'ADMIN';
-
-  // Lấy đúng 1 chữ cái đầu của tên chính (tự động bỏ xưng hô a, c, e, anh, chị...)
-  const getAvatarChar = (rawName = '') => {
-    const cleaned = rawName.replace(/\(.*?\)/g, '').trim();
-    if (!cleaned) return 'H';
-
-    const prefixes = [
-      'a', 'c', 'e', 'anh', 'chị', 'chi', 'em', 'bé', 'be',
-      'cô', 'co', 'chú', 'chu', 'bác', 'bac', 'bạn', 'ban'
-    ];
-    const words = cleaned.split(/\s+/).filter(Boolean);
-
-    while (words.length > 1 && prefixes.includes(words[0].toLowerCase())) {
-      words.shift();
-    }
-
-    const mainWord = words.find(w => /^[a-zA-ZÀ-ỹ]/.test(w)) || words[0];
-    return mainWord.charAt(0).toUpperCase();
-  };
 
   useEffect(() => {
     document.title = 'Gym DinhLe';
@@ -608,7 +751,7 @@ export default function App() {
     const weeklyCount = (client.weeklySchedule || []).length;
     const isTodayScheduled = Boolean(todaySession || todayWeeklySlot);
     const isTodayCompleted = todaySession?.status === 'COMPLETED';
-    const portalInitials = getAvatarChar(client.name);
+    const portalVisual = getClientVisualInfo(client);
 
     return (
       <div className="app-shell portal-shell">
@@ -653,7 +796,12 @@ export default function App() {
           {/* 1. HERO CARD THÔNG TIN HỘI VIÊN */}
           <section className="PortalHeroCard">
             <div className="PortalHeroLeft">
-              <div className="PortalAvatar">{portalInitials}</div>
+              <div
+                className={`PortalAvatar variant-${portalVisual.variant}`}
+                title={portalVisual.label}
+              >
+                {portalVisual.renderIcon(26)}
+              </div>
               <div className="PortalHeroInfo">
                 <div className="PortalHeroKicker">
                   <span>HỒ SƠ HỘI VIÊN GYM DINHLE</span>
@@ -1383,10 +1531,20 @@ export default function App() {
                           const validCountHeader = sessions.filter(
                             s => s.trainerId === trainer._id && s.status !== 'CANCELLED'
                           ).length;
+                          const trainerVisual = getTrainerVisualInfo({ isOff, validCount: validCountHeader });
+
                           return (
                             <th key={trainer._id} className={`ThTrainer ${isOff ? 'trainer-is-off' : ''}`}>
                               <div className="ThTrainerTop">
-                                <span className="TrainerName" title={trainer.name}>{trainer.name}</span>
+                                <div className="ThTrainerNameGroup">
+                                  <span
+                                    className={`HeaderMiniIcon variant-${trainerVisual.variant}`}
+                                    title={trainerVisual.label}
+                                  >
+                                    {trainerVisual.renderIcon(13)}
+                                  </span>
+                                  <span className="TrainerName" title={trainer.name}>{trainer.name}</span>
+                                </div>
                                 <span className={`HeaderMiniCount ${validCountHeader > 0 ? 'has-shift' : ''}`}>
                                   {validCountHeader}
                                 </span>
@@ -1571,7 +1729,7 @@ export default function App() {
                   </table>
                 </div>
               ) : (
-                /* CHẾ ĐỘ 2: THẺ THEO TỪNG PT (CHỐNG RỚT NÚT & TỐI ƯU HIỂN THỊ) */
+                /* CHẾ ĐỘ 2: THẺ THEO TỪNG PT (ICON VECTOR SVG TỐI GIẢN THEO TRẠNG THÁI) */
                 <div className="TrainerCardsGrid">
                   {trainers.map(trainer => {
                     const ptSessions = getSortedTrainerSessions(trainer._id);
@@ -1579,7 +1737,7 @@ export default function App() {
                     const validCount = validList.length;
                     const doubleCount = validList.filter(s => isDoubleSession(s)).length;
                     const isOff = ptSessions.some(s => s.clientName === 'OFF');
-                    const initials = getAvatarChar(trainer.name);
+                    const trainerVisual = getTrainerVisualInfo({ isOff, validCount });
 
                     return (
                       <div
@@ -1589,8 +1747,11 @@ export default function App() {
                         <div className="PTCardHeader">
                           <div className="PTCardTitleRow">
                             <div className="PTCardIdentity">
-                              <span className={`PTAvatar ${validCount > 0 ? 'active' : ''}`}>
-                                {initials}
+                              <span
+                                className={`PTAvatar variant-${trainerVisual.variant}`}
+                                title={trainerVisual.label}
+                              >
+                                {trainerVisual.renderIcon(18)}
                               </span>
                               <strong className="PTCardName" title={trainer.name}>
                                 {trainer.name}
@@ -1865,7 +2026,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* DANH SÁCH THẺ KHÁCH HÀNG (GIAO DIỆN GỌN, HIỆN ĐẠI, DỄ QUÉT) */}
+          {/* DANH SÁCH THẺ KHÁCH HÀNG (ICON VECTOR SVG THEO TRẠNG THÁI & LOẠI KHÁCH) */}
           {displayedClients.length === 0 ? (
             <div className="ClientsEmptyBox">
               <div className="ClientsEmptyIcon">🔎</div>
@@ -1891,18 +2052,21 @@ export default function App() {
                 const sortedSlots = [...(client.weeklySchedule || [])].sort(
                   (a, b) => a.dayOfWeek - b.dayOfWeek
                 );
-                const clientInitials = getAvatarChar(client.name);
+                const clientVisual = getClientVisualInfo(client);
 
                 return (
                   <div
                     key={client._id}
-                    className={`ClientCardV2 ${isActive ? 'is-active' : 'is-paused'}`}
+                    className={`ClientCardV2 variant-${clientVisual.variant} ${isActive ? 'is-active' : 'is-paused'}`}
                   >
-                    {/* Header: Avatar + Tên + Trạng thái */}
+                    {/* Header: Icon Vector SVG + Tên + Trạng thái */}
                     <div className="ClientCardV2Header">
                       <div className="ClientCardV2Identity">
-                        <span className={`ClientAvatar ${isActive ? 'active' : 'paused'}`}>
-                          {clientInitials}
+                        <span
+                          className={`ClientAvatar variant-${clientVisual.variant}`}
+                          title={clientVisual.label}
+                        >
+                          {clientVisual.renderIcon(18)}
                         </span>
                         <div className="ClientNameBlock">
                           <div className="ClientNameText" title={client.name}>
@@ -2107,6 +2271,7 @@ export default function App() {
             <div className="SummaryCardsGrid">
               {summaryByTrainer.map(({ trainer, totalShifts, totalDoubleShifts, dailyBreakdown }) => {
                 const barPercent = totalShifts > 0 ? Math.max(8, Math.round((totalShifts / maxTrainerShifts) * 100)) : 0;
+                const trainerVisual = getTrainerVisualInfo({ isOff: false, validCount: totalShifts });
 
                 return (
                   <div
@@ -2114,12 +2279,20 @@ export default function App() {
                     className={`SummaryPTCard ${totalShifts === 0 ? 'empty-pt' : ''}`}
                   >
                     <div className="SummaryPTHeader">
-                      <div>
-                        <div className="SummaryPTName">{trainer.name}</div>
-                        <div className="SummaryPTSub">
-                          {dailyBreakdown.length > 0
-                            ? `${dailyBreakdown.length} ngày có ca chốt`
-                            : 'Chưa phát sinh ca chốt'}
+                      <div className="SummaryPTIdentity">
+                        <span
+                          className={`PTAvatar variant-${trainerVisual.variant}`}
+                          title={trainerVisual.label}
+                        >
+                          {trainerVisual.renderIcon(17)}
+                        </span>
+                        <div>
+                          <div className="SummaryPTName">{trainer.name}</div>
+                          <div className="SummaryPTSub">
+                            {dailyBreakdown.length > 0
+                              ? `${dailyBreakdown.length} ngày có ca chốt`
+                              : 'Chưa phát sinh ca chốt'}
+                          </div>
                         </div>
                       </div>
 

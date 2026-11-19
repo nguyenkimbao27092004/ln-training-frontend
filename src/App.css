@@ -428,6 +428,39 @@ body {
   margin-bottom: 7px;
 }
 
+.ThTrainerNameGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.HeaderMiniIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.HeaderMiniIcon.variant-active {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.HeaderMiniIcon.variant-idle {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.HeaderMiniIcon.variant-off {
+  background: #fef3c7;
+  color: #d97706;
+}
+
 .TrainerName {
   font-size: 13.5px;
   font-weight: 800;
@@ -783,7 +816,7 @@ body {
   white-space: nowrap;
 }
 
-/* ==================== CHẾ ĐỘ XEM THẺ PT (MODERN CARDS) ==================== */
+/* ==================== CHẾ ĐỘ XEM THẺ PT (MODERN CARDS + SVG ICON) ==================== */
 .TrainerCardsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
@@ -845,24 +878,42 @@ body {
   flex: 1;
 }
 
+/* Icon Badge cho PT */
 .PTAvatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: #e2e8f0;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 800;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: all 0.16s ease;
 }
 
-.PTAvatar.active {
+.PTAvatar svg {
+  display: block;
+}
+
+.PTAvatar.variant-active {
   background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   color: #ffffff;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.28);
+  border-color: transparent;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.28);
+}
+
+.PTAvatar.variant-idle {
+  background: #f1f5f9;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+}
+
+.PTAvatar.variant-off {
+  background: #fef3c7;
+  color: #d97706;
+  border-color: #fde68a;
 }
 
 .PTCardName {
@@ -1225,7 +1276,7 @@ body {
   background: #ffe4e6;
 }
 
-/* Lưới thẻ Khách Hàng hiện đại */
+/* Lưới thẻ Khách Hàng hiện đại (Phân màu theo loại & trạng thái) */
 .ClientsGridV2 {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(295px, 1fr));
@@ -1252,6 +1303,14 @@ body {
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07);
 }
 
+.ClientCardV2.variant-group {
+  border-top-color: #7c3aed;
+}
+
+.ClientCardV2.variant-online {
+  border-top-color: #0891b2;
+}
+
 .ClientCardV2.is-paused {
   border-top-color: #f59e0b;
   background: #fffefb;
@@ -1272,27 +1331,43 @@ body {
   flex: 1;
 }
 
+/* Icon Badge cho Khách Hàng */
 .ClientAvatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  font-size: 12.5px;
-  font-weight: 800;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: all 0.16s ease;
 }
 
-.ClientAvatar.active {
+.ClientAvatar svg {
+  display: block;
+}
+
+.ClientAvatar.variant-active {
   background: linear-gradient(135deg, #059669 0%, #10b981 100%);
   color: #ffffff;
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25);
 }
 
-.ClientAvatar.paused {
+.ClientAvatar.variant-group {
+  background: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25);
+}
+
+.ClientAvatar.variant-online {
+  background: linear-gradient(135deg, #0284c7 0%, #06b6d4 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(6, 182, 212, 0.25);
+}
+
+.ClientAvatar.variant-paused {
   background: #fef3c7;
-  color: #b45309;
+  color: #d97706;
   border: 1px solid #fde68a;
 }
 
@@ -1635,20 +1710,38 @@ body {
   z-index: 1;
 }
 
+/* Icon Badge lớn ở trang Khách Hàng */
 .PortalAvatar {
   width: 56px;
   height: 56px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #3b82f6 0%, #10b981 100%);
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
   color: #ffffff;
-  font-size: 20px;
-  font-weight: 800;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
-  border: 2px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.28);
+}
+
+.PortalAvatar svg {
+  display: block;
+}
+
+.PortalAvatar.variant-group {
+  background: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 100%);
+  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.38);
+}
+
+.PortalAvatar.variant-online {
+  background: linear-gradient(135deg, #0284c7 0%, #06b6d4 100%);
+  box-shadow: 0 6px 18px rgba(6, 182, 212, 0.38);
+}
+
+.PortalAvatar.variant-paused {
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
 }
 
 .PortalHeroInfo {
@@ -2679,6 +2772,14 @@ body {
   justify-content: space-between;
   align-items: flex-start;
   gap: 8px;
+}
+
+.SummaryPTIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
 }
 
 .SummaryPTName {
