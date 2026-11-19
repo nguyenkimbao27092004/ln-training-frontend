@@ -1513,7 +1513,7 @@ body {
   color: #64748b;
 }
 
-/* LƯỚI THẺ DÙNG CHUNG (PORTAL KHÁCH HÀNG) */
+/* LƯỚI THẺ DÙNG CHUNG */
 .ClientCardsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -1583,46 +1583,804 @@ body {
   color: #94a3b8;
 }
 
-/* ==================== GIAO DIỆN TRANG KHÁCH HÀNG (CLIENT PORTAL) ==================== */
-.ClientPortalHeroCard {
+/* ==================== GIAO DIỆN TRANG KHÁCH HÀNG (CLIENT PORTAL HIỆN ĐẠI) ==================== */
+.portal-shell {
+  background: linear-gradient(180deg, #eef2f7 0%, #f8fafc 45%, #f1f5f9 100%);
+}
+
+.PortalContainer {
+  width: 100%;
+  max-width: 1020px;
+  margin: 0 auto;
+  padding: 18px 16px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* 1. Hero Card Thông Tin Hội Viên */
+.PortalHeroCard {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 58%, #1e3a8a 100%);
+  color: #ffffff;
+  border-radius: 18px;
+  padding: 20px 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
+  position: relative;
+  overflow: hidden;
+}
+
+.PortalHeroCard::after {
+  content: '';
+  position: absolute;
+  top: -55px;
+  right: -45px;
+  width: 210px;
+  height: 210px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.28) 0%, rgba(59, 130, 246, 0) 70%);
+  pointer-events: none;
+}
+
+.PortalHeroLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  flex: 1;
+  min-width: 260px;
+  position: relative;
+  z-index: 1;
+}
+
+.PortalAvatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #3b82f6 0%, #10b981 100%);
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+}
+
+.PortalHeroInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.PortalHeroKicker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: #93c5fd;
+}
+
+.PortalStatusChip {
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.PortalStatusChip.active {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+}
+
+.PortalStatusChip.paused {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fde68a;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+}
+
+.PortalHeroName {
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.PortalHeroMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.PortalMetaPill {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 5px 11px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  color: #e2e8f0;
+}
+
+.PortalMetaPill strong {
+  color: #ffffff;
+}
+
+.PortalHeroNote {
+  margin-top: 4px;
+  background: rgba(254, 243, 199, 0.14);
+  border: 1px solid rgba(253, 224, 71, 0.35);
+  color: #fef08a;
+  padding: 6px 11px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  width: fit-content;
+}
+
+.PortalHeroStats {
+  display: flex;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.PortalStatTile {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 12px 16px;
+  min-width: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  backdrop-filter: blur(6px);
+}
+
+.PortalStatTile.tile-emerald {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(52, 211, 153, 0.32);
+}
+
+.PortalStatNum {
+  font-size: 24px;
+  font-weight: 900;
+  color: #ffffff;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.PortalStatTile.tile-emerald .PortalStatNum {
+  color: #6ee7b7;
+}
+
+.PortalStatLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+/* 2. Card Lịch Tập Hôm Nay */
+.PortalTodayCard {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #dbeafe;
+  border-left: 5px solid #2563eb;
+  padding: 18px 20px;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.PortalTodayCard.today-done {
+  border-color: #bbf7d0;
+  border-left-color: #10b981;
+  box-shadow: 0 8px 22px rgba(16, 185, 129, 0.08);
+}
+
+.PortalTodayCard.today-rest {
+  border-color: #e2e8f0;
+  border-left-color: #64748b;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.PortalTodayTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.PortalTodayDateBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  padding: 4px 11px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.PortalTodayCard.today-done .PortalTodayDateBadge {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.PortalTodayCard.today-rest .PortalTodayDateBadge {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.PortalTodayDateDivider {
+  opacity: 0.45;
+}
+
+.PortalTodayStateTag {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 11px;
+  border-radius: 99px;
+}
+
+.PortalTodayStateTag.scheduled {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.PortalTodayStateTag.done {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.PortalTodayStateTag.rest {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.PortalTodayBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.PortalTodayMain {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.PortalTodayTimeBlock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.PortalTodayClock {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.PortalTodayCard.today-done .PortalTodayClock {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.PortalTodayHeadline {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.PortalTodayTimeHighlight {
+  color: #2563eb;
+}
+
+.PortalTodayCard.today-done .PortalTodayTimeHighlight {
+  color: #059669;
+}
+
+.PortalTodaySubline {
+  font-size: 13px;
+  color: #475569;
+  margin-top: 3px;
+}
+
+.PortalFocusBadge {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  color: #ffffff;
+  padding: 9px 15px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
+}
+
+.PortalTodayCard.today-done .PortalFocusBadge {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.25);
+}
+
+.PortalFocusLabel {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.PortalFocusValue {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.PortalWorkoutBox {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.PortalWorkoutBoxTitle {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.PortalWorkoutBoxText {
+  font-size: 13.5px;
+  color: #334155;
+  white-space: pre-line;
+  line-height: 1.55;
+}
+
+.PortalTodayTip {
+  font-size: 12.5px;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 9px 12px;
+}
+
+.PortalRestMessage {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.PortalRestIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+/* 3. Section Lịch Cố Định Tuần & Nhật Ký */
+.PortalSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.PortalSectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.PortalSectionTitle {
+  font-size: 16.5px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.PortalSectionSub {
+  font-size: 12.5px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.PortalCountChip {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  padding: 4px 11px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.PortalCountChip.chip-emerald {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+/* Thanh 7 ngày tổng quan nhanh */
+.PortalWeekStrip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+}
+
+.PortalStripItem {
+  position: relative;
+  border-radius: 10px;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+  border: 1px solid transparent;
+}
+
+.PortalStripItem.has-slot {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.PortalStripItem.is-rest {
+  background: #f8fafc;
+  border-color: #f1f5f9;
+}
+
+.PortalStripItem.is-today {
+  border: 2px solid #2563eb;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.14);
+}
+
+.PortalStripDay {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.PortalStripItem.is-rest .PortalStripDay {
+  color: #94a3b8;
+}
+
+.PortalStripItem.is-today .PortalStripDay {
+  color: #1d4ed8;
+}
+
+.PortalStripTime {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1d4ed8;
+  font-variant-numeric: tabular-nums;
+}
+
+.PortalStripItem.is-rest .PortalStripTime {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.PortalStripTodayDot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+
+/* Lưới thẻ lịch tuần chi tiết */
+.PortalWeekGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.PortalDayCard {
   background: #ffffff;
   border-radius: 14px;
-  border: 1px solid #cbd5e1;
-  padding: 18px 20px;
+  border: 1px solid #e2e8f0;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  transition: all 0.16s ease;
+}
+
+.PortalDayCard.has-session {
+  border-top: 3px solid #2563eb;
+}
+
+.PortalDayCard.has-session:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.09);
+}
+
+.PortalDayCard.rest-day {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  box-shadow: none;
+}
+
+.PortalDayCard.is-today {
+  border: 2px solid #2563eb;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
+}
+
+.PortalDayCardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.PortalDayTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.PortalDayName {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.PortalDayCard.rest-day .PortalDayName {
+  color: #64748b;
+}
+
+.PortalDayCard.is-today .PortalDayName {
+  color: #1d4ed8;
+}
+
+.PortalTodayMiniTag {
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 99px;
+}
+
+.PortalDayTimeBadge {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  padding: 3px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.PortalDayRestTag {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 99px;
+}
+
+.PortalDayContent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.PortalDayPtRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #475569;
+}
+
+.PortalDayPtRow strong {
+  color: #0f172a;
+}
+
+.PortalDayMuscleBox {
+  border-radius: 10px;
+  padding: 9px 11px;
+  margin-top: auto;
+}
+
+.PortalDayMuscleBox.filled {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.PortalDayMuscleBox.empty {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+}
+
+.PortalDayMuscleTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #1d4ed8;
+}
+
+.PortalDayMuscleBox.empty .PortalDayMuscleTitle {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.PortalDayMuscleNote {
+  font-size: 12.5px;
+  color: #1e293b;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid #dbeafe;
+  white-space: pre-line;
+  line-height: 1.45;
+}
+
+.PortalDayRestBody {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 8px;
+  color: #94a3b8;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* 4. Nhật ký các buổi tập đã hoàn thành */
+.PortalJournalGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.PortalLogCard {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #10b981;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  transition: all 0.16s ease;
+}
+
+.PortalLogCard:hover {
+  border-color: #a7f3d0;
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.09);
+}
+
+.PortalLogTop {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 12px;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
-  margin-bottom: 14px;
+  gap: 10px;
 }
 
-.TodayWorkoutBanner {
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  border: 1.5px solid #60a5fa;
-  border-radius: 14px;
-  padding: 16px 20px;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+.PortalLogDateWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.WorkoutFocusPill {
-  background: #1e40af;
-  color: #ffffff;
-  padding: 7px 14px;
-  border-radius: 10px;
-  font-size: 13.5px;
-  box-shadow: 0 2px 6px rgba(30, 64, 175, 0.25);
+.PortalLogCheckIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 14px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.WorkoutDetailBox {
-  background: #ffffff;
-  border: 1px solid #93c5fd;
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-top: 12px;
-  font-size: 13.5px;
+.PortalLogDate {
+  font-size: 14px;
+  font-weight: 800;
   color: #0f172a;
+}
+
+.PortalLogMeta {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.PortalLogMeta strong {
+  color: #334155;
+}
+
+.PortalLogStatusPill {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.PortalLogWorkoutBox {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 9px 11px;
+}
+
+.PortalLogWorkoutTitle {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #166534;
+}
+
+.PortalLogWorkoutNote {
+  font-size: 12.5px;
+  color: #1e293b;
+  margin-top: 5px;
+  white-space: pre-line;
+  line-height: 1.45;
 }
 
 /* ==================== MÀN HÌNH ĐĂNG NHẬP / ĐĂNG KÝ ==================== */
@@ -1773,6 +2531,12 @@ body {
   .NavBtn { flex: 1; text-align: center; padding: 7px 6px; font-size: 12px; }
   .ToolbarCard { margin: 8px 8px 0; padding: 10px; }
   .MainArea { padding: 8px 8px 20px; }
+  .PortalContainer { padding: 12px 10px 28px; }
+  .PortalHeroCard { padding: 16px; }
+  .PortalHeroStats { width: 100%; }
+  .PortalStatTile { flex: 1; }
+  .PortalWeekStrip { gap: 5px; padding: 8px 6px; }
+  .PortalStripTime { font-size: 10px; }
 }
 
 /* ==================== TAB 3: TỔNG HỢP & DỌN THÁNG (TỐI ƯU GIAO DIỆN) ==================== */

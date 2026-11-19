@@ -586,8 +586,17 @@ export default function App() {
     // Lọc chỉ lấy những ca tập đã hoàn thành (COMPLETED) để hiển thị ở phần Nhật ký của khách hàng
     const completedSessions = recentSessions.filter(s => s.status === 'COMPLETED');
 
+    const weeklyCount = (client.weeklySchedule || []).length;
+    const isTodayScheduled = Boolean(todaySession || todayWeeklySlot);
+    const isTodayCompleted = todaySession?.status === 'COMPLETED';
+    const portalNameWords = (client.name || '').trim().split(/\s+/).filter(Boolean);
+    const portalInitials =
+      portalNameWords.length >= 2
+        ? (portalNameWords[0][0] + portalNameWords[portalNameWords.length - 1][0]).toUpperCase()
+        : (client.name || 'HV').slice(0, 2).toUpperCase();
+
     return (
-      <div className="app-shell">
+      <div className="app-shell portal-shell">
         <header className="ProHeader">
           <div className="BrandRow">
             <img
@@ -614,9 +623,9 @@ export default function App() {
               <button
                 onClick={handleClientLoginSubmit}
                 className="LogoutBtn"
-                style={{ marginRight: '4px' }}
+                disabled={authLoading}
               >
-                🔄 Làm mới
+                {authLoading ? '⏳ Đang tải...' : '🔄 Làm mới'}
               </button>
               <button onClick={handleClientLogout} className="LogoutBtn">
                 🚪 Thoát
@@ -625,226 +634,264 @@ export default function App() {
           </div>
         </header>
 
-        <div className="MainArea" style={{ maxWidth: '960px', margin: '0 auto' }}>
-          {/* THÔNG TIN CÁ NHÂN CỦA KHÁCH HÀNG */}
-          <div className="ClientPortalHeroCard">
-            <div>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                Thông tin hội viên
-              </div>
-              <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '4px 0' }}>
-                {client.name}
-              </h2>
-              <div style={{ fontSize: '13.5px', color: '#334155', display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '6px' }}>
-                <span>📱 SĐT: <strong>{client.phone}</strong></span>
-                <span>🏋️ PT Phụ trách: <strong>{client.primaryTrainerId?.name || 'Đang cập nhật'}</strong></span>
-              </div>
-              {cleanNote && (
-                <div style={{ marginTop: '8px', fontSize: '12.5px', color: '#b45309', background: '#fffbeb', padding: '5px 10px', borderRadius: '6px', border: '1px solid #fde68a', display: 'inline-block', fontWeight: 600 }}>
-                  📌 Ghi chú gói tập: {cleanNote}
+        <div className="PortalContainer">
+          {/* 1. HERO CARD THÔNG TIN HỘI VIÊN */}
+          <section className="PortalHeroCard">
+            <div className="PortalHeroLeft">
+              <div className="PortalAvatar">{portalInitials}</div>
+              <div className="PortalHeroInfo">
+                <div className="PortalHeroKicker">
+                  <span>HỒ SƠ HỘI VIÊN GYM DINHLE</span>
+                  <span className={`PortalStatusChip ${client.status === 'ACTIVE' ? 'active' : 'paused'}`}>
+                    {client.status === 'ACTIVE' ? '● Đang hoạt động' : '⏸ Đang tạm nghỉ (OFF)'}
+                  </span>
                 </div>
-              )}
+                <h2 className="PortalHeroName">{client.name}</h2>
+                <div className="PortalHeroMeta">
+                  <span className="PortalMetaPill">
+                    📱 SĐT: <strong>{client.phone}</strong>
+                  </span>
+                  <span className="PortalMetaPill">
+                    🏋️ PT phụ trách: <strong>{client.primaryTrainerId?.name || 'Đang cập nhật'}</strong>
+                  </span>
+                </div>
+                {cleanNote && (
+                  <div className="PortalHeroNote">
+                    📌 Ghi chú gói tập: <strong>{cleanNote}</strong>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <span
-              className="StatusBadge"
-              style={{
-                background: client.status === 'ACTIVE' ? '#dcfce7' : '#fef3c7',
-                color: client.status === 'ACTIVE' ? '#166534' : '#92400e',
-                fontSize: '13px',
-                padding: '6px 14px'
-              }}
-            >
-              {client.status === 'ACTIVE' ? '● Đang hoạt động' : '⏸ Đang tạm nghỉ (OFF)'}
-            </span>
-          </div>
+            <div className="PortalHeroStats">
+              <div className="PortalStatTile">
+                <span className="PortalStatNum">{weeklyCount}</span>
+                <span className="PortalStatLabel">Buổi / tuần</span>
+              </div>
+              <div className="PortalStatTile tile-emerald">
+                <span className="PortalStatNum">{completedSessions.length}</span>
+                <span className="PortalStatLabel">Đã hoàn thành</span>
+              </div>
+            </div>
+          </section>
 
-          {/* THẺ LỊCH TẬP HÔM NAY CỦA KHÁCH */}
-          <div className="TodayWorkoutBanner">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-              <div>
-                <span style={{ fontSize: '12px', fontWeight: 800, background: '#1d4ed8', color: '#fff', padding: '3px 8px', borderRadius: '5px' }}>
-                  HÔM NAY — {formatHeaderDate(todayStr).toUpperCase()}
-                </span>
-                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginTop: '8px' }}>
-                  {todaySession || todayWeeklySlot
-                    ? `⏰ Ca tập lúc: ${activeTimeToday || 'Báo sau'} — Cùng PT ${activeTrainerToday}`
-                    : '🌿 Hôm nay bạn không có lịch tập cố định (Ngày nghỉ phục hồi cơ)'}
-                </h3>
+          {/* 2. THẺ LỊCH TẬP HÔM NAY NỔI BẬT */}
+          <section
+            className={`PortalTodayCard ${
+              isTodayCompleted ? 'today-done' : isTodayScheduled ? 'today-active' : 'today-rest'
+            }`}
+          >
+            <div className="PortalTodayTop">
+              <div className="PortalTodayDateBadge">
+                <span>📅 HÔM NAY</span>
+                <span className="PortalTodayDateDivider">•</span>
+                <span>{formatHeaderDate(todayStr)}</span>
               </div>
 
-              {activeWorkoutTypeToday && (
-                <div className="WorkoutFocusPill">
-                  🎯 Hôm nay tập: <strong>{activeWorkoutTypeToday.toUpperCase()}</strong>
-                </div>
-              )}
+              <span
+                className={`PortalTodayStateTag ${
+                  isTodayCompleted ? 'done' : isTodayScheduled ? 'scheduled' : 'rest'
+                }`}
+              >
+                {isTodayCompleted
+                  ? '✅ Đã hoàn thành buổi tập'
+                  : isTodayScheduled
+                  ? '🔥 Lịch tập hôm nay'
+                  : '🌿 Ngày nghỉ phục hồi'}
+              </span>
             </div>
 
-            {activeWorkoutNoteToday ? (
-              <div className="WorkoutDetailBox">
-                <strong>📝 Chi tiết các bài tập hôm nay do PT soạn:</strong>
-                <div style={{ whiteSpace: 'pre-line', marginTop: '4px', lineHeight: 1.5 }}>
-                  {activeWorkoutNoteToday}
-                </div>
-              </div>
-            ) : (todaySession || todayWeeklySlot) ? (
-              <div style={{ fontSize: '12.5px', color: '#475569', marginTop: '6px' }}>
-                💡 PT sẽ hướng dẫn chi tiết giáo án trực tiếp tại phòng tập.
-              </div>
-            ) : null}
-          </div>
+            <div className="PortalTodayBody">
+              {isTodayScheduled ? (
+                <>
+                  <div className="PortalTodayMain">
+                    <div className="PortalTodayTimeBlock">
+                      <span className="PortalTodayClock">⏰</span>
+                      <div>
+                        <div className="PortalTodayHeadline">
+                          Ca tập lúc <span className="PortalTodayTimeHighlight">{activeTimeToday || 'Báo sau'}</span>
+                        </div>
+                        <div className="PortalTodaySubline">
+                          Huấn luyện viên đồng hành: <strong>{activeTrainerToday}</strong>
+                        </div>
+                      </div>
+                    </div>
 
-          {/* LỊCH TẬP CỐ ĐỊNH TRONG TUẦN CỦA KHÁCH */}
-          <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: '18px 0 10px' }}>
-            📅 Lịch Tập Cố Định Trong Tuần Của Bạn
-          </h3>
-
-          <div className="ClientCardsGrid" style={{ marginTop: 0 }}>
-            {DAYS.map(day => {
-              const slot = client.weeklySchedule?.find(s => s.dayOfWeek === day.num);
-              const isToday = day.num === todayDayOfWeek;
-
-              return (
-                <div
-                  key={day.num}
-                  className="ClientItemCard"
-                  style={{
-                    border: isToday ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                    background: slot ? '#ffffff' : '#f8fafc',
-                    opacity: slot ? 1 : 0.75
-                  }}
-                >
-                  <div className="ClientCardTop">
-                    <span style={{ fontSize: '15px', fontWeight: 800, color: isToday ? '#2563eb' : '#0f172a' }}>
-                      {day.label} {isToday && '(Hôm nay)'}
-                    </span>
-                    {slot ? (
-                      <span className="ScheduleTag" style={{ fontSize: '12.5px' }}>
-                        ⏰ {slot.time || 'Báo sau'}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>
-                        Nghỉ ngơi
-                      </span>
+                    {activeWorkoutTypeToday && (
+                      <div className="PortalFocusBadge">
+                        <span className="PortalFocusLabel">Nhóm cơ hôm nay</span>
+                        <strong className="PortalFocusValue">🎯 {activeWorkoutTypeToday.toUpperCase()}</strong>
+                      </div>
                     )}
                   </div>
 
-                  {slot ? (
-                    <>
-                      <div style={{ fontSize: '13px', color: '#334155' }}>
-                        👨‍🏫 Huấn luyện viên: <strong>{getTrainerName(slot.assignedTrainerId)}</strong>
+                  {activeWorkoutNoteToday ? (
+                    <div className="PortalWorkoutBox">
+                      <div className="PortalWorkoutBoxTitle">
+                        📝 Chi tiết giáo án hôm nay do PT soạn
                       </div>
-
-                      <div
-                        style={{
-                          background: slot.workoutType ? '#eff6ff' : '#f1f5f9',
-                          border: slot.workoutType ? '1px solid #bfdbfe' : '1px dashed #cbd5e1',
-                          padding: '8px 10px',
-                          borderRadius: '8px',
-                          marginTop: '4px'
-                        }}
-                      >
-                        <div style={{ fontSize: '13px', fontWeight: 800, color: slot.workoutType ? '#1d4ed8' : '#64748b' }}>
-                          {slot.workoutType
-                            ? `🏋️ Nhóm cơ: ${slot.workoutType}`
-                            : '🏋️ Nhóm cơ: Chưa ghi (Thân trên / Thân dưới)'}
-                        </div>
-
-                        {slot.workoutNote && (
-                          <div
-                            style={{
-                              fontSize: '12.5px',
-                              color: '#1e293b',
-                              marginTop: '6px',
-                              whiteSpace: 'pre-line',
-                              borderTop: '1px solid #dbeafe',
-                              paddingTop: '6px'
-                            }}
-                          >
-                            <strong>Bài tập:</strong> {slot.workoutNote}
-                          </div>
-                        )}
-                      </div>
-                    </>
+                      <div className="PortalWorkoutBoxText">{activeWorkoutNoteToday}</div>
+                    </div>
                   ) : (
-                    <div style={{ fontSize: '12.5px', color: '#94a3b8' }}>
-                      Không có ca tập cố định vào ngày này.
+                    <div className="PortalTodayTip">
+                      💡 PT sẽ hướng dẫn chi tiết kỹ thuật và mức tạ phù hợp trực tiếp tại phòng tập.
                     </div>
                   )}
+                </>
+              ) : (
+                <div className="PortalRestMessage">
+                  <div className="PortalRestIcon">🌿</div>
+                  <div>
+                    <div className="PortalTodayHeadline">Hôm nay bạn không có lịch tập cố định</div>
+                    <div className="PortalTodaySubline">
+                      Hãy dành thời gian giãn cơ nhẹ, bổ sung đủ nước và dinh dưỡng để cơ bắp phục hồi tốt nhất!
+                    </div>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+              )}
+            </div>
+          </section>
 
-          {/* CÁC BUỔI TẬP GẦN ĐÂY TRÊN LỊCH NGÀY (CHỈ HIỂN THỊ NHỮNG CA ĐÃ HOÀN THÀNH) */}
-          {completedSessions.length > 0 && (
-            <>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: '22px 0 10px' }}>
-                📝 Nhật Ký Các Buổi Tập Theo Ngày Của Bạn
-              </h3>
-              <div className="ClientCardsGrid" style={{ marginTop: 0 }}>
-                {completedSessions.map(s => (
-                  <div key={s._id} className="ClientItemCard">
-                    <div className="ClientCardTop">
-                      <strong style={{ fontSize: '14px', color: '#0f172a' }}>
-                        {formatHeaderDate(s.date)}
-                      </strong>
-                      <span
-                        className="StatusBadge"
-                        style={{
-                          background:
-                            s.status === 'COMPLETED'
-                              ? '#dcfce7'
-                              : s.status === 'CANCELLED'
-                              ? '#fee2e2'
-                              : '#e0f2fe',
-                          color:
-                            s.status === 'COMPLETED'
-                              ? '#166534'
-                              : s.status === 'CANCELLED'
-                              ? '#991b1b'
-                              : '#0369a1'
-                        }}
-                      >
-                        {s.status === 'COMPLETED'
-                          ? '✅ Đã hoàn thành'
-                          : s.status === 'CANCELLED'
-                          ? '✕ Đã nghỉ / Hủy'
-                          : `⏰ Lịch hẹn: ${s.time || 'h'}`}
-                      </span>
+          {/* 3. LỊCH TẬP CỐ ĐỊNH TRONG TUẦN */}
+          <section className="PortalSection">
+            <div className="PortalSectionHeader">
+              <div>
+                <h3 className="PortalSectionTitle">📅 Lịch Tập Cố Định Trong Tuần</h3>
+                <p className="PortalSectionSub">
+                  Tổng quan các khung giờ và nhóm cơ cố định hàng tuần của bạn
+                </p>
+              </div>
+              <span className="PortalCountChip">{weeklyCount} buổi / tuần</span>
+            </div>
+
+            {/* Thanh tổng quan nhanh 7 ngày trong tuần */}
+            <div className="PortalWeekStrip">
+              {DAYS.map(day => {
+                const slot = client.weeklySchedule?.find(s => s.dayOfWeek === day.num);
+                const isToday = day.num === todayDayOfWeek;
+                const shortLabel = day.num === 8 ? 'CN' : `T${day.num}`;
+                return (
+                  <div
+                    key={day.num}
+                    className={`PortalStripItem ${slot ? 'has-slot' : 'is-rest'} ${isToday ? 'is-today' : ''}`}
+                  >
+                    <span className="PortalStripDay">{shortLabel}</span>
+                    <span className="PortalStripTime">
+                      {slot ? (slot.time || 'Có lịch') : 'Nghỉ'}
+                    </span>
+                    {isToday && <span className="PortalStripTodayDot" title="Hôm nay" />}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Lưới chi tiết từng thứ */}
+            <div className="PortalWeekGrid">
+              {DAYS.map(day => {
+                const slot = client.weeklySchedule?.find(s => s.dayOfWeek === day.num);
+                const isToday = day.num === todayDayOfWeek;
+
+                return (
+                  <div
+                    key={day.num}
+                    className={`PortalDayCard ${slot ? 'has-session' : 'rest-day'} ${isToday ? 'is-today' : ''}`}
+                  >
+                    <div className="PortalDayCardTop">
+                      <div className="PortalDayTitleGroup">
+                        <span className="PortalDayName">{day.label}</span>
+                        {isToday && <span className="PortalTodayMiniTag">Hôm nay</span>}
+                      </div>
+
+                      {slot ? (
+                        <span className="PortalDayTimeBadge">⏰ {slot.time || 'Báo sau'}</span>
+                      ) : (
+                        <span className="PortalDayRestTag">Nghỉ ngơi</span>
+                      )}
                     </div>
 
-                    <div style={{ fontSize: '12.5px', color: '#475569' }}>
-                      PT hướng dẫn: <strong>{getTrainerName(s.trainerId)}</strong> • Giờ tập: <strong>{s.time || '—'}</strong>
+                    {slot ? (
+                      <div className="PortalDayContent">
+                        <div className="PortalDayPtRow">
+                          <span>👨‍🏫 HLV:</span>
+                          <strong>{getTrainerName(slot.assignedTrainerId)}</strong>
+                        </div>
+
+                        <div className={`PortalDayMuscleBox ${slot.workoutType ? 'filled' : 'empty'}`}>
+                          <div className="PortalDayMuscleTitle">
+                            <span>🏋️</span>
+                            <span>
+                              {slot.workoutType
+                                ? slot.workoutType
+                                : 'Chưa ghi nhóm cơ'}
+                            </span>
+                          </div>
+
+                          {slot.workoutNote && (
+                            <div className="PortalDayMuscleNote">
+                              <strong>Bài tập:</strong> {slot.workoutNote}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="PortalDayRestBody">
+                        <span>☕ Không có ca tập cố định</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* 4. NHẬT KÝ CÁC BUỔI TẬP ĐÃ HOÀN THÀNH */}
+          {completedSessions.length > 0 && (
+            <section className="PortalSection">
+              <div className="PortalSectionHeader">
+                <div>
+                  <h3 className="PortalSectionTitle">🏆 Nhật Ký Các Buổi Tập Đã Hoàn Thành</h3>
+                  <p className="PortalSectionSub">
+                    Ghi nhận những buổi tập bạn đã hoàn thành cùng huấn luyện viên
+                  </p>
+                </div>
+                <span className="PortalCountChip chip-emerald">
+                  ✅ {completedSessions.length} buổi
+                </span>
+              </div>
+
+              <div className="PortalJournalGrid">
+                {completedSessions.map(s => (
+                  <div key={s._id} className="PortalLogCard">
+                    <div className="PortalLogTop">
+                      <div className="PortalLogDateWrap">
+                        <span className="PortalLogCheckIcon">✓</span>
+                        <div>
+                          <div className="PortalLogDate">{formatHeaderDate(s.date)}</div>
+                          <div className="PortalLogMeta">
+                            PT: <strong>{getTrainerName(s.trainerId)}</strong> • Giờ: <strong>{s.time || '—'}</strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className="PortalLogStatusPill">Đã hoàn thành</span>
                     </div>
 
                     {(s.workoutType || s.workoutNote) && (
-                      <div
-                        style={{
-                          background: '#f0fdf4',
-                          border: '1px solid #bbf7d0',
-                          padding: '8px 10px',
-                          borderRadius: '8px',
-                          fontSize: '12.5px',
-                          color: '#166534'
-                        }}
-                      >
+                      <div className="PortalLogWorkoutBox">
                         {s.workoutType && (
-                          <div style={{ fontWeight: 800, marginBottom: s.workoutNote ? '4px' : 0 }}>
-                            🎯 Tập: {s.workoutType}
+                          <div className="PortalLogWorkoutTitle">
+                            🎯 Nhóm cơ: {s.workoutType}
                           </div>
                         )}
                         {s.workoutNote && (
-                          <div style={{ whiteSpace: 'pre-line', color: '#1e293b' }}>
-                            {s.workoutNote}
-                          </div>
+                          <div className="PortalLogWorkoutNote">{s.workoutNote}</div>
                         )}
                       </div>
                     )}
                   </div>
                 ))}
               </div>
-            </>
+            </section>
           )}
         </div>
       </div>
