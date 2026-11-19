@@ -108,7 +108,20 @@ export default function App() {
   const [summaryViewMode, setSummaryViewMode] = useState('CARDS'); // CARDS | TABLE
 
   const isAdmin = currentUser?.role === 'ADMIN';
+  const getAvatarChar = (rawName = '') => {
+    const cleaned = rawName.replace(/\(.*?\)/g, '').trim();
+    if (!cleaned) return 'H';
 
+    const prefixes = ['a', 'c', 'e', 'anh', 'chị', 'chi', 'em', 'bé', 'be', 'cô', 'co', 'chú', 'chu', 'bác', 'bac', 'bạn', 'ban'];
+    const words = cleaned.split(/\s+/).filter(Boolean);
+
+    while (words.length > 1 && prefixes.includes(words[0].toLowerCase())) {
+      words.shift();
+    }
+
+    const mainWord = words.find(w => /^[a-zA-ZÀ-ỹ]/.test(w)) || words[0];
+    return mainWord.charAt(0).toUpperCase();
+  };
   useEffect(() => {
     document.title = 'Gym DinhLe';
     let link = document.querySelector("link[rel~='icon']");
@@ -589,11 +602,7 @@ export default function App() {
     const weeklyCount = (client.weeklySchedule || []).length;
     const isTodayScheduled = Boolean(todaySession || todayWeeklySlot);
     const isTodayCompleted = todaySession?.status === 'COMPLETED';
-    const portalNameWords = (client.name || '').trim().split(/\s+/).filter(Boolean);
-    const portalInitials =
-      portalNameWords.length >= 2
-        ? (portalNameWords[0][0] + portalNameWords[portalNameWords.length - 1][0]).toUpperCase()
-        : (client.name || 'HV').slice(0, 2).toUpperCase();
+    const clientInitials = getAvatarChar(client.name);
 
     return (
       <div className="app-shell portal-shell">
@@ -1564,13 +1573,7 @@ export default function App() {
                     const validCount = validList.length;
                     const doubleCount = validList.filter(s => isDoubleSession(s)).length;
                     const isOff = ptSessions.some(s => s.clientName === 'OFF');
-
-                    const cleanNameForAvatar = (trainer.name || '').replace(/\(.*?\)/g, '').trim();
-                    const nameWords = cleanNameForAvatar.split(/\s+/).filter(Boolean);
-                    const initials =
-                      nameWords.length >= 2
-                        ? (nameWords[0][0] + nameWords[nameWords.length - 1][0]).toUpperCase()
-                        : cleanNameForAvatar.slice(0, 2).toUpperCase() || 'PT';
+                    const initials = getAvatarChar(trainer.name);
 
                     return (
                       <div
@@ -1882,11 +1885,7 @@ export default function App() {
                 const sortedSlots = [...(client.weeklySchedule || [])].sort(
                   (a, b) => a.dayOfWeek - b.dayOfWeek
                 );
-                const cleanNameWords = (client.name || '').trim().split(/\s+/).filter(Boolean);
-                const clientInitials =
-                  cleanNameWords.length >= 2
-                    ? (cleanNameWords[0][0] + cleanNameWords[cleanNameWords.length - 1][0]).toUpperCase()
-                    : (client.name || 'HV').slice(0, 2).toUpperCase();
+                const clientInitials = getAvatarChar(client.name);    
 
                 return (
                   <div
