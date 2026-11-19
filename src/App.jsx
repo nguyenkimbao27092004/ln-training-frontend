@@ -108,11 +108,16 @@ export default function App() {
   const [summaryViewMode, setSummaryViewMode] = useState('CARDS'); // CARDS | TABLE
 
   const isAdmin = currentUser?.role === 'ADMIN';
+
+  // Lấy đúng 1 chữ cái đầu của tên chính (tự động bỏ xưng hô a, c, e, anh, chị...)
   const getAvatarChar = (rawName = '') => {
     const cleaned = rawName.replace(/\(.*?\)/g, '').trim();
     if (!cleaned) return 'H';
 
-    const prefixes = ['a', 'c', 'e', 'anh', 'chị', 'chi', 'em', 'bé', 'be', 'cô', 'co', 'chú', 'chu', 'bác', 'bac', 'bạn', 'ban'];
+    const prefixes = [
+      'a', 'c', 'e', 'anh', 'chị', 'chi', 'em', 'bé', 'be',
+      'cô', 'co', 'chú', 'chu', 'bác', 'bac', 'bạn', 'ban'
+    ];
     const words = cleaned.split(/\s+/).filter(Boolean);
 
     while (words.length > 1 && prefixes.includes(words[0].toLowerCase())) {
@@ -122,6 +127,7 @@ export default function App() {
     const mainWord = words.find(w => /^[a-zA-ZÀ-ỹ]/.test(w)) || words[0];
     return mainWord.charAt(0).toUpperCase();
   };
+
   useEffect(() => {
     document.title = 'Gym DinhLe';
     let link = document.querySelector("link[rel~='icon']");
@@ -602,7 +608,7 @@ export default function App() {
     const weeklyCount = (client.weeklySchedule || []).length;
     const isTodayScheduled = Boolean(todaySession || todayWeeklySlot);
     const isTodayCompleted = todaySession?.status === 'COMPLETED';
-    const clientInitials = getAvatarChar(client.name);
+    const portalInitials = getAvatarChar(client.name);
 
     return (
       <div className="app-shell portal-shell">
@@ -1885,7 +1891,7 @@ export default function App() {
                 const sortedSlots = [...(client.weeklySchedule || [])].sort(
                   (a, b) => a.dayOfWeek - b.dayOfWeek
                 );
-                const clientInitials = getAvatarChar(client.name);    
+                const clientInitials = getAvatarChar(client.name);
 
                 return (
                   <div
