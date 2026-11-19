@@ -737,20 +737,98 @@ export default function App() {
       return found ? found.name : (client.primaryTrainerId?.name || 'PT Gym DinhLe');
     };
 
-    const todaySession = recentSessions.find(s => s.date === todayStr && s.status !== 'CANCELLED');
+    // Lấy ngày YYYY-MM-DD tương ứng với từng thứ (T2=2 ... CN=8) của tuần hiện tại
+    const getDateStrForCurrentWeekDay = (targetDayOfWeek) => {
+      const now = new Date();
+      const currentDow = now.getDay() === 0 ? 8 : now.getDay() + 1;
+      const diff = targetDayOfWeek - currentDow;
+      const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    };
+
+    // Tìm buổi xếp lịch thực tế theo ngày (ưu tiên ca đang hoạt động / đã chốt trước ca hủy)
+    const findActualSessionByDate = (dateStr) => {
+      const matches = recentSessions.filter(s => s.date === dateStr && s.clientName !== 'OFF');
+      if (matches.length === 0) return null;
+      return matches.find(s => s.status !== 'CANCELLED') || matches[0];
+    };
+
+    // Ưu tiên thông tin buổi tập của ca xếp lịch/chốt ca hôm đó; nếu trống mới lấy dự phòng từ lịch tuần
+    const resolveWorkoutInfo = (actualSession, weeklySlot) => {
+      const hasCustom = Boolean(actualSession?.workoutType || actualSession?.workoutNote);
+      return {
+        workoutType: hasCustom ? (actualSession.workoutType || '') : (weeklySlot?.workoutType || ''),
+        workoutNote: hasCustom ? (actualSession.workoutNote || '') : (weeklySlot?.workoutNote || '')
+      };
+    };
+
+    const todaySession = findActualSessionByDate(todayStr);
     const todayWeeklySlot = client.weeklySchedule?.find(s => s.dayOfWeek === todayDayOfWeek);
 
-    const activeWorkoutTypeToday = todaySession?.workoutType || todayWeeklySlot?.workoutType || '';
-    const activeWorkoutNoteToday = todaySession?.workoutNote || todayWeeklySlot?.workoutNote || '';
-    const activeTimeToday = todaySession?.time || todayWeeklySlot?.time || '';
-    const activeTrainerToday = getTrainerName(todaySession?.trainerId || todayWeeklySlot?.assignedTrainerId);
+    const isTodayCancelled = todaySession?.status === 'CANCELLED';
+    const isTodayCompleted = todaySession?.status === 'COMPLETED';
+    const isTodayScheduled = !isTodayCancelled && Boolean(todaySession || todayWeeklySlot);
 
-    // Lọc chỉ lấy những ca tập đã hoàn thành (COMPLETED) để hiển thị ở phần Nhật ký của khách hàng
-    const completedSessions = recentSessions.filter(s => s.status === 'COMPLETED');
+    const todayResolvedWorkout = isTodayCancelled
+      ? { workoutType: '', workoutNote: '' }
+      : resolveWorkoutInfo(todaySession, todayWeeklySlot);
+
+    const activeWorkoutTypeToday = todayResolvedWorkout.workoutType;
+    const activeWorkoutNoteToday = todayResolvedWorkout.workoutNote;
+    const activeTimeToday = isTodayCancelled
+      ? ''
+      : (todaySession?.time || todayWeeklySlot?.time || '');
+    const activeTrainerToday = getTrainerName(
+      todaySession?.trainerId || todayWeeklySlot?.assignedTrainerId
+    );
+
+    // Lọc chỉ lấy những ca tập đã hoàn thành (COMPLETED) và luôn đầy đủ thông tin buổi tập
+    const completedSessions = recentSessions
+      .filter(s => s.status === 'COMPLETED' && s.clientName !== 'OFF')
+      .map(s => {
+        const [y, m, d] = (s.date || '').split('-').map(Number);
+        const jsD = y && m && d ? new Date(y, m - 1, d).getDay() : 0;
+        const dow = s.dayOfWeek || (jsD === 0 ? 8 : jsD + 1);
+        const weeklySlot = client.weeklySchedule?.find(w => w.dayOfWeek === dow);
+        const resolved = resolveWorkoutInfo(s, weeklySlot);
+        return {
+          ...s,
+          workoutType: resolved.workoutType,
+          workoutNote: resolved.workoutNote
+        };
+      });
+
+    // Dữ liệu 7 ngày tuần này: ưu tiên dữ liệu xếp lịch & chốt ca thực tế từng ngày
+    const currentWeekDays = DAYS.map(day => {
+      const dateStr = getDateStrForCurrentWeekDay(day.num);
+      const actualSession = findActualSessionByDate(dateStr);
+      const weeklySlot = client.weeklySchedule?.find(s => s.dayOfWeek === day.num);
+      const isCancelled = actualSession?.status === 'CANCELLED';
+      const isCompleted = actualSession?.status === 'COMPLETED';
+      const isExtraSession = !isCancelled && !weeklySlot && Boolean(actualSession);
+      const hasSession = !isCancelled && Boolean(actualSession || weeklySlot);
+      const resolved = isCancelled
+        ? { workoutType: '', workoutNote: '' }
+        : resolveWorkoutInfo(actualSession, weeklySlot);
+
+      return {
+        ...day,
+        dateStr,
+        isToday: day.num === todayDayOfWeek,
+        actualSession,
+        weeklySlot,
+        isCancelled,
+        isCompleted,
+        isExtraSession,
+        hasSession,
+        time: actualSession?.time || weeklySlot?.time || '',
+        trainerName: getTrainerName(actualSession?.trainerId || weeklySlot?.assignedTrainerId),
+        workoutType: resolved.workoutType,
+        workoutNote: resolved.workoutNote
+      };
+    });
 
     const weeklyCount = (client.weeklySchedule || []).length;
-    const isTodayScheduled = Boolean(todaySession || todayWeeklySlot);
-    const isTodayCompleted = todaySession?.status === 'COMPLETED';
     const portalVisual = getClientVisualInfo(client);
 
     return (
@@ -838,7 +916,7 @@ export default function App() {
             </div>
           </section>
 
-          {/* 2. THẺ LỊCH TẬP HÔM NAY NỔI BẬT */}
+          {/* 2. THẺ LỊCH TẬP HÔM NAY NỔI BẬT (ƯU TIÊN LỊCH XẾP & CHỐT CA THỰC TẾ) */}
           <section
             className={`PortalTodayCard ${
               isTodayCompleted ? 'today-done' : isTodayScheduled ? 'today-active' : 'today-rest'
@@ -855,11 +933,20 @@ export default function App() {
                 className={`PortalTodayStateTag ${
                   isTodayCompleted ? 'done' : isTodayScheduled ? 'scheduled' : 'rest'
                 }`}
+                style={
+                  isTodayCancelled
+                    ? { background: '#fee2e2', color: '#b91c1c' }
+                    : undefined
+                }
               >
                 {isTodayCompleted
-                  ? '✅ Đã hoàn thành buổi tập'
+                  ? '✅ Đã chốt ca hoàn thành'
+                  : isTodayCancelled
+                  ? '✕ Đã báo nghỉ / Hủy'
                   : isTodayScheduled
-                  ? '🔥 Lịch tập hôm nay'
+                  ? todaySession
+                    ? '🔥 Đã xếp lịch hôm nay'
+                    : '🔥 Lịch tập hôm nay'
                   : '🌿 Ngày nghỉ phục hồi'}
               </span>
             </div>
@@ -876,6 +963,21 @@ export default function App() {
                         </div>
                         <div className="PortalTodaySubline">
                           Huấn luyện viên đồng hành: <strong>{activeTrainerToday}</strong>
+                          {todaySession && isDoubleSession(todaySession) && (
+                            <span
+                              style={{
+                                marginLeft: '8px',
+                                background: '#ede9fe',
+                                color: '#6d28d9',
+                                padding: '2px 7px',
+                                borderRadius: '99px',
+                                fontSize: '11px',
+                                fontWeight: 800
+                              }}
+                            >
+                              👥 Ca đôi
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -901,6 +1003,21 @@ export default function App() {
                     </div>
                   )}
                 </>
+              ) : isTodayCancelled ? (
+                <div className="PortalRestMessage">
+                  <div
+                    className="PortalRestIcon"
+                    style={{ background: '#fef2f2', borderColor: '#fecaca' }}
+                  >
+                    ✕
+                  </div>
+                  <div>
+                    <div className="PortalTodayHeadline">Buổi tập hôm nay đã được báo nghỉ / hủy</div>
+                    <div className="PortalTodaySubline">
+                      Lịch ngày hôm nay đã cập nhật trạng thái nghỉ. Hẹn gặp lại bạn ở buổi tập tiếp theo!
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <div className="PortalRestMessage">
                   <div className="PortalRestIcon">🌿</div>
@@ -915,34 +1032,63 @@ export default function App() {
             </div>
           </section>
 
-          {/* 3. LỊCH TẬP CỐ ĐỊNH TRONG TUẦN */}
+          {/* 3. LỊCH TẬP TRONG TUẦN NÀY (ƯU TIÊN LỊCH XẾP & CHỐT CA THỰC TẾ) */}
           <section className="PortalSection">
             <div className="PortalSectionHeader">
               <div>
-                <h3 className="PortalSectionTitle">📅 Lịch Tập Cố Định Trong Tuần</h3>
+                <h3 className="PortalSectionTitle">📅 Lịch Tập Trong Tuần Của Bạn</h3>
                 <p className="PortalSectionSub">
-                  Tổng quan các khung giờ và nhóm cơ cố định hàng tuần của bạn
+                  Tự động đồng bộ theo lịch xếp thực tế & chốt ca từng ngày (kết hợp lịch cố định)
                 </p>
               </div>
-              <span className="PortalCountChip">{weeklyCount} buổi / tuần</span>
+              <span className="PortalCountChip">{weeklyCount} buổi cố định / tuần</span>
             </div>
 
             {/* Thanh tổng quan nhanh 7 ngày trong tuần */}
             <div className="PortalWeekStrip">
-              {DAYS.map(day => {
-                const slot = client.weeklySchedule?.find(s => s.dayOfWeek === day.num);
-                const isToday = day.num === todayDayOfWeek;
+              {currentWeekDays.map(day => {
                 const shortLabel = day.num === 8 ? 'CN' : `T${day.num}`;
                 return (
                   <div
                     key={day.num}
-                    className={`PortalStripItem ${slot ? 'has-slot' : 'is-rest'} ${isToday ? 'is-today' : ''}`}
+                    className={`PortalStripItem ${day.hasSession ? 'has-slot' : 'is-rest'} ${day.isToday ? 'is-today' : ''}`}
+                    style={
+                      day.isCompleted
+                        ? { background: '#ecfdf5', borderColor: day.isToday ? '#10b981' : '#a7f3d0' }
+                        : day.isCancelled
+                        ? { background: '#fef2f2', borderColor: day.isToday ? '#ef4444' : '#fecaca' }
+                        : undefined
+                    }
                   >
-                    <span className="PortalStripDay">{shortLabel}</span>
-                    <span className="PortalStripTime">
-                      {slot ? (slot.time || 'Có lịch') : 'Nghỉ'}
+                    <span
+                      className="PortalStripDay"
+                      style={
+                        day.isCompleted
+                          ? { color: '#047857' }
+                          : day.isCancelled
+                          ? { color: '#b91c1c' }
+                          : undefined
+                      }
+                    >
+                      {shortLabel}
                     </span>
-                    {isToday && <span className="PortalStripTodayDot" title="Hôm nay" />}
+                    <span
+                      className="PortalStripTime"
+                      style={
+                        day.isCompleted
+                          ? { color: '#059669' }
+                          : day.isCancelled
+                          ? { color: '#dc2626' }
+                          : undefined
+                      }
+                    >
+                      {day.isCancelled
+                        ? 'Đã hủy'
+                        : day.hasSession
+                        ? `${day.isCompleted ? '✓ ' : ''}${day.time || 'Có lịch'}`
+                        : 'Nghỉ'}
+                    </span>
+                    {day.isToday && <span className="PortalStripTodayDot" title="Hôm nay" />}
                   </div>
                 );
               })}
@@ -950,60 +1096,126 @@ export default function App() {
 
             {/* Lưới chi tiết từng thứ */}
             <div className="PortalWeekGrid">
-              {DAYS.map(day => {
-                const slot = client.weeklySchedule?.find(s => s.dayOfWeek === day.num);
-                const isToday = day.num === todayDayOfWeek;
-
-                return (
-                  <div
-                    key={day.num}
-                    className={`PortalDayCard ${slot ? 'has-session' : 'rest-day'} ${isToday ? 'is-today' : ''}`}
-                  >
-                    <div className="PortalDayCardTop">
-                      <div className="PortalDayTitleGroup">
-                        <span className="PortalDayName">{day.label}</span>
-                        {isToday && <span className="PortalTodayMiniTag">Hôm nay</span>}
-                      </div>
-
-                      {slot ? (
-                        <span className="PortalDayTimeBadge">⏰ {slot.time || 'Báo sau'}</span>
-                      ) : (
-                        <span className="PortalDayRestTag">Nghỉ ngơi</span>
+              {currentWeekDays.map(day => (
+                <div
+                  key={day.num}
+                  className={`PortalDayCard ${day.hasSession ? 'has-session' : 'rest-day'} ${day.isToday ? 'is-today' : ''}`}
+                  style={
+                    day.isCompleted
+                      ? { borderTopColor: '#10b981' }
+                      : day.isCancelled
+                      ? { borderColor: '#fecaca', background: '#fffafa' }
+                      : undefined
+                  }
+                >
+                  <div className="PortalDayCardTop">
+                    <div className="PortalDayTitleGroup" style={{ flexWrap: 'wrap' }}>
+                      <span className="PortalDayName">{day.label}</span>
+                      {day.isToday && <span className="PortalTodayMiniTag">Hôm nay</span>}
+                      {day.isCompleted && (
+                        <span
+                          className="PortalTodayMiniTag"
+                          style={{ background: '#10b981' }}
+                        >
+                          ✓ Đã chốt
+                        </span>
+                      )}
+                      {day.isExtraSession && !day.isCompleted && (
+                        <span
+                          className="PortalTodayMiniTag"
+                          style={{ background: '#7c3aed' }}
+                        >
+                          Xếp bổ sung
+                        </span>
                       )}
                     </div>
 
-                    {slot ? (
-                      <div className="PortalDayContent">
-                        <div className="PortalDayPtRow">
-                          <span>👨‍🏫 HLV:</span>
-                          <strong>{getTrainerName(slot.assignedTrainerId)}</strong>
-                        </div>
-
-                        <div className={`PortalDayMuscleBox ${slot.workoutType ? 'filled' : 'empty'}`}>
-                          <div className="PortalDayMuscleTitle">
-                            <span>🏋️</span>
-                            <span>
-                              {slot.workoutType
-                                ? slot.workoutType
-                                : 'Chưa ghi nhóm cơ'}
-                            </span>
-                          </div>
-
-                          {slot.workoutNote && (
-                            <div className="PortalDayMuscleNote">
-                              <strong>Bài tập:</strong> {slot.workoutNote}
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                    {day.isCancelled ? (
+                      <span
+                        className="PortalDayRestTag"
+                        style={{ background: '#fee2e2', color: '#b91c1c' }}
+                      >
+                        ✕ Đã hủy
+                      </span>
+                    ) : day.hasSession ? (
+                      <span
+                        className="PortalDayTimeBadge"
+                        style={
+                          day.isCompleted
+                            ? { background: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' }
+                            : undefined
+                        }
+                      >
+                        ⏰ {day.time || 'Báo sau'}
+                      </span>
                     ) : (
-                      <div className="PortalDayRestBody">
-                        <span>☕ Không có ca tập cố định</span>
-                      </div>
+                      <span className="PortalDayRestTag">Nghỉ ngơi</span>
                     )}
                   </div>
-                );
-              })}
+
+                  {day.isCancelled ? (
+                    <div className="PortalDayRestBody" style={{ color: '#b91c1c' }}>
+                      <span>✕ Buổi tập ngày này đã báo nghỉ / hủy</span>
+                    </div>
+                  ) : day.hasSession ? (
+                    <div className="PortalDayContent">
+                      <div className="PortalDayPtRow">
+                        <span>👨‍🏫 HLV:</span>
+                        <strong>{day.trainerName}</strong>
+                        {day.actualSession && isDoubleSession(day.actualSession) && (
+                          <span
+                            style={{
+                              marginLeft: 'auto',
+                              background: '#ede9fe',
+                              color: '#6d28d9',
+                              padding: '1.5px 7px',
+                              borderRadius: '99px',
+                              fontSize: '10.5px',
+                              fontWeight: 800
+                            }}
+                          >
+                            👥 Ca đôi
+                          </span>
+                        )}
+                      </div>
+
+                      <div
+                        className={`PortalDayMuscleBox ${day.workoutType ? 'filled' : 'empty'}`}
+                        style={
+                          day.isCompleted && day.workoutType
+                            ? { background: '#f0fdf4', borderColor: '#bbf7d0' }
+                            : undefined
+                        }
+                      >
+                        <div
+                          className="PortalDayMuscleTitle"
+                          style={day.isCompleted && day.workoutType ? { color: '#15803d' } : undefined}
+                        >
+                          <span>🏋️</span>
+                          <span>
+                            {day.workoutType
+                              ? day.workoutType
+                              : 'Chưa ghi nhóm cơ'}
+                          </span>
+                        </div>
+
+                        {day.workoutNote && (
+                          <div
+                            className="PortalDayMuscleNote"
+                            style={day.isCompleted ? { borderTopColor: '#bbf7d0' } : undefined}
+                          >
+                            <strong>Bài tập:</strong> {day.workoutNote}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="PortalDayRestBody">
+                      <span>☕ Không có ca tập cố định</span>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </section>
 
